@@ -20,8 +20,8 @@
 #include "synch.h"
 #include "system.h"
 
-#define STACK_FENCEPOST 0xdeadbeef // this is put at the top of the
-                                   // execution stack, for detecting
+#define STACK_FENCEPOST 0xdeadbeef // this is put at the top of the  \
+                                   // execution stack, for detecting \
                                    // stack overflows
 
 //----------------------------------------------------------------------
@@ -46,13 +46,13 @@ Thread::Thread(char *threadName)
     ASSERT(pre_tid != -1);
     setTid(pre_tid);
     valid_threads[tid] = this;
-    (void) interrupt->SetLevel(oldlevel);
+    (void)interrupt->SetLevel(oldlevel);
 
 #ifdef USER_PROGRAM
     space = NULL;
 #endif
 }
-Thread* Thread::valid_threads[MAX_THREAD_NUM] = {};
+Thread *Thread::valid_threads[MAX_THREAD_NUM] = {};
 int Thread::getValidid()
 {
     int valid_id = -1;
