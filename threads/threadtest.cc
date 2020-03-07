@@ -28,8 +28,9 @@ void SimpleThread(int which)
 {
     int num;
 
-    for (num = 0; num < 5; num++)
+    for (num = 0; num < 3; num++)
     {
+        Thread::TS();
         printf("*** thread %d with TID %d and UID %d looped %d times\n", which, currentThread->getTid(), currentThread->getUid(), num);
         currentThread->Yield();
     }
@@ -45,10 +46,37 @@ void ThreadTest1()
 {
     DEBUG('t', "Entering ThreadTest1");
 
-    Thread *t = new Thread("forked thread");
+    Thread *t = Thread::Create_thread("Forked Thread");
 
     t->Fork(SimpleThread, 1);
     SimpleThread(0);
+    Thread::TS();
+}
+
+void ThreadTest2_limit()
+{
+    DEBUG('t', "Entering limit_ThreadTest");
+    for (int i = 0; i <= 128; i++)
+    {
+        Thread *t = Thread::Create_thread("Forked Thread");
+        if(t!=NULL) t->Print();
+        //SimpleThread(currentThread->getTid());
+    }
+    
+}
+
+void ThreadTest3_TS()
+{
+    DEBUG('t', "Entering ThreadTest3_TS");
+    Thread *t1 = Thread::Create_thread("thread1");
+    Thread *t2 = Thread::Create_thread("thread2");
+    Thread *t3 = Thread::Create_thread("thread3");
+
+    t1->Fork(SimpleThread, 1);
+    t2->Fork(SimpleThread, 1);
+    t3->Fork(SimpleThread, 1);
+    
+
 }
 
 //----------------------------------------------------------------------
@@ -62,6 +90,12 @@ void ThreadTest()
     {
     case 1:
         ThreadTest1();
+        break;
+    case 2:
+        ThreadTest2_limit();
+        break;
+    case 3:
+        ThreadTest3_TS();
         break;
     default:
         printf("No test specified.\n");

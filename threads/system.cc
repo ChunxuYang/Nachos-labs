@@ -77,7 +77,7 @@ void Initialize(int argc, char **argv)
     int argCount;
     char *debugArgs = "";
     bool randomYield = FALSE;
-    for (int i = 0; i < MAX_THREAD_NUM; i++)
+    for (int i = 0; i < MAX_THREAD_NUM+5; i++)
     {
         Thread::valid_threads[i] = NULL;
     }
@@ -150,7 +150,7 @@ void Initialize(int argc, char **argv)
     // We didn't explicitly allocate the current thread we are running in.
     // But if it ever tries to give up the CPU, we better have a Thread
     // object to save its state.
-    currentThread = new Thread("main");
+    currentThread = Thread::Create_thread("main");
     currentThread->setStatus(RUNNING);
 
     interrupt->Enable();

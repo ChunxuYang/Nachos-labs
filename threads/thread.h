@@ -50,14 +50,20 @@
 // For simplicity, this is just the max over all architectures.
 #define MachineStateSize 18
 
-
 // Size of the thread's private execution stack.
 // WATCH OUT IF THIS ISN'T BIG ENOUGH!!!!!
-#define StackSize	(4 * 1024)	// in words
+#define StackSize (4 * 1024) // in words
 #define MAX_THREAD_NUM 128
 
 // Thread state
-enum ThreadStatus { JUST_CREATED, RUNNING, READY, BLOCKED };
+enum ThreadStatus
+{
+  JUST_CREATED,
+  RUNNING,
+  READY,
+  BLOCKED
+};
+const char *const ThreadStatus_Name[] = {"JUST_CREATED", "RUNNING", "READY", "BLOCKED"};
 
 // external function, dummy routine whose sole job is to call Thread::Print
 extern void ThreadPrint(int arg);
@@ -73,84 +79,88 @@ extern void ThreadPrint(int arg);
 //  Some threads also belong to a user address space; threads
 //  that only run in the kernel have a NULL address space.
 
-class Thread {
-  private:
-    // NOTE: DO NOT CHANGE the order of these first two members.
-    // THEY MUST be in this position for SWITCH to work.
-    int* stackTop;			 // the current stack pointer
-    int machineState[MachineStateSize];  // all registers except for stackTop
-    int uid;
-    int tid;
-    
-  public:
-    static Thread* valid_threads[MAX_THREAD_NUM];
-    Thread(char* debugName);		// initialize a Thread
-    ~Thread(); 				// deallocate a Thread
-					// NOTE -- thread being deleted
-					// must not be running when delete
-					// is called
+class Thread
+{
+private:
+  // NOTE: DO NOT CHANGE the order of these first two members.
+  // THEY MUST be in this position for SWITCH to work.
+  int *stackTop;                      // the current stack pointer
+  int machineState[MachineStateSize]; // all registers except for stackTop
+  int uid;
+  int tid;
 
-    // basic thread operations
+public:
+  static Thread *valid_threads[MAX_THREAD_NUM + 5];
+  Thread(char *debugName, int tid); // initialize a Thread
+  ~Thread();                        // deallocate a Thread
+                                    // NOTE -- thread being deleted
+                                    // must not be running when delete
+                                    // is called
 
-    void Fork(VoidFunctionPtr func, int arg); 	// Make thread run (*func)(arg)
-    void Yield();  				// Relinquish the CPU if any
-						// other thread is runnable
-    void Sleep();  				// Put the thread to sleep and
-						// relinquish the processor
-    void Finish();  				// The thread is done executing
+  // basic thread operations
 
-    void CheckOverflow();   			// Check if thread has
-						// overflowed its stack
-    void setStatus(ThreadStatus st) { status = st; }
-    char* getName() { return (name); }
-    void Print() { printf("%s, ", name); }
+  void Fork(VoidFunctionPtr func, int arg); // Make thread run (*func)(arg)
+  void Yield();                             // Relinquish the CPU if any
+      // other thread is runnable
+  void Sleep(); // Put the thread to sleep and
+      // relinquish the processor
+  void Finish(); // The thread is done executing
 
-    int getUid() { return uid; }
-    int getTid() { return tid; }
-    void setUid(int u) { uid = u; }
-    void setTid(int t) { tid = t; }
+  void CheckOverflow(); // Check if thread has
+      // overflowed its stack
+  void setStatus(ThreadStatus st) { status = st; }
+  char *getName() { return (name); }
+  void Print() { printf("Thread \"%s\" with tid %d and uid %d running, status is \"%s\"\n", name, tid, uid, ThreadStatus_Name[status]); }
 
-    static int getValidid();
+  int getUid() { return uid; }
+  int getTid() { return tid; }
+  void setUid(int u) { uid = u; }
+  void setTid(int t) { tid = t; }
 
-  private:
-    // some of the private data for this class is listed above
+  static int getValidid();
+  static Thread *Create_thread(char *debugname);
+  static void TS();
 
-    int* stack; 	 		// Bottom of the stack
-					// NULL if this is the main thread
-					// (If NULL, don't deallocate stack)
-    ThreadStatus status;		// ready, running or blocked
-    char* name;
+private:
+  // some of the private data for this class is listed above
 
-    void StackAllocate(VoidFunctionPtr func, int arg);
-    					// Allocate a stack for thread.
-					// Used internally by Fork()
+  int *stack;          // Bottom of the stack
+                       // NULL if this is the main thread
+                       // (If NULL, don't deallocate stack)
+  ThreadStatus status; // ready, running or blocked
+  char *name;
+
+  void StackAllocate(VoidFunctionPtr func, int arg);
+  // Allocate a stack for thread.
+  // Used internally by Fork()
 
 #ifdef USER_PROGRAM
-// A thread running a user program actually has *two* sets of CPU registers --
-// one for its state while executing user code, one for its state
-// while executing kernel code.
+  // A thread running a user program actually has *two* sets of CPU registers --
+  // one for its state while executing user code, one for its state
+  // while executing kernel code.
 
-    int userRegisters[NumTotalRegs];	// user-level CPU register state
+  int userRegisters[NumTotalRegs]; // user-level CPU register state
 
-  public:
-    void SaveUserState();		// save user-level register state
-    void RestoreUserState();		// restore user-level register state
+public:
+  void SaveUserState();    // save user-level register state
+  void RestoreUserState(); // restore user-level register state
 
-    AddrSpace *space;			// User code this thread is running.
+  AddrSpace *space; // User code this thread is running.
 #endif
 };
 
 // Magical machine-dependent routines, defined in switch.s
 
-extern "C" {
-// First frame on thread execution stack;
-//   	enable interrupts
-//	call "func"
-//	(when func returns, if ever) call ThreadFinish()
-void ThreadRoot();
+extern "C"
+{
+  // First frame on thread execution stack;
+  //   	enable interrupts
+  //	call "func"
+  //	(when func returns, if ever) call ThreadFinish()
+  void ThreadRoot();
 
-// Stop running oldThread and start running newThread
-void SWITCH(Thread *oldThread, Thread *newThread);
+  // Stop running oldThread and start running newThread
+  void SWITCH(Thread *oldThread, Thread *newThread);
 }
 
 #endif // THREAD_H

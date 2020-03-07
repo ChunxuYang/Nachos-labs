@@ -32,7 +32,7 @@
 //	"threadName" is an arbitrary string, useful for debugging.
 //----------------------------------------------------------------------
 
-Thread::Thread(char *threadName)
+Thread::Thread(char *threadName, int tid)
 {
     name = threadName;
     stackTop = NULL;
@@ -40,11 +40,11 @@ Thread::Thread(char *threadName)
     status = JUST_CREATED;
 
     IntStatus oldlevel = interrupt->SetLevel(IntOff);
-    int pre_tid = getValidid();
-    if (pre_tid == -1)
-        printf("Arriving max thread num, fails to create new thread\n");
-    ASSERT(pre_tid != -1);
-    setTid(pre_tid);
+    // int pre_tid = getValidid();
+    // if (pre_tid == -1)
+    //     printf("Arriving max thread num, fails to create new thread\n");
+    // ASSERT(pre_tid != -1);
+    setTid(tid);
     valid_threads[tid] = this;
     (void)interrupt->SetLevel(oldlevel);
 
@@ -52,7 +52,7 @@ Thread::Thread(char *threadName)
     space = NULL;
 #endif
 }
-Thread *Thread::valid_threads[MAX_THREAD_NUM] = {};
+Thread *Thread::valid_threads[MAX_THREAD_NUM+5] = {};
 int Thread::getValidid()
 {
     int valid_id = -1;
@@ -64,9 +64,39 @@ int Thread::getValidid()
             break;
         }
     }
+    //printf("ValidID:%d\n", valid_id);
     return valid_id;
 }
+Thread* Thread::Create_thread(char* debugname)
+{
+    IntStatus oldlevel = interrupt->SetLevel(IntOff);
+    int id = Thread::getValidid();
+    //printf("get id %d\n",id);
+    if (id == -1)
+    {
+        printf("Arriving MAX thread count, fail to create new thread.\n");
+        (void)interrupt->SetLevel(oldlevel);
+        return NULL;
+    }
+    else
+    {
+        Thread* t = new Thread(debugname, id);
+        (void)interrupt->SetLevel(oldlevel);
+        return t;
+    }
+}
 
+void Thread::TS()
+{
+    for (int i = 0; i < MAX_THREAD_NUM; i++)
+    {
+        if(Thread::valid_threads[i]!=NULL)
+        {
+            Thread::valid_threads[i]->Print();
+        }
+    }
+    
+}
 //----------------------------------------------------------------------
 // Thread::~Thread
 // 	De-allocate a thread.
