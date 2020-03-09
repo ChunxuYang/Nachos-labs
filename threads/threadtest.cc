@@ -75,8 +75,6 @@ void ThreadTest3_TS()
     t1->Fork(SimpleThread, 1);
     t2->Fork(SimpleThread, 1);
     t3->Fork(SimpleThread, 1);
-    
-
 }
 
 //----------------------------------------------------------------------
