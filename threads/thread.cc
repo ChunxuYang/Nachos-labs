@@ -32,7 +32,7 @@
 //	"threadName" is an arbitrary string, useful for debugging.
 //----------------------------------------------------------------------
 
-Thread::Thread(char *threadName, int tid)
+Thread::Thread(char *threadName, int tid, int priority)
 {
     name = threadName;
     stackTop = NULL;
@@ -40,10 +40,8 @@ Thread::Thread(char *threadName, int tid)
     status = JUST_CREATED;
 
     IntStatus oldlevel = interrupt->SetLevel(IntOff);
-    // int pre_tid = getValidid();
-    // if (pre_tid == -1)
-    //     printf("Arriving max thread num, fails to create new thread\n");
-    // ASSERT(pre_tid != -1);
+    
+    setPriority(priority);
     setTid(tid);
     valid_threads[tid] = this;
     (void)interrupt->SetLevel(oldlevel);
@@ -52,7 +50,7 @@ Thread::Thread(char *threadName, int tid)
     space = NULL;
 #endif
 }
-Thread *Thread::valid_threads[MAX_THREAD_NUM+5] = {};
+Thread *Thread::valid_threads[MAX_THREAD_NUM + 5] = {};
 int Thread::getValidid()
 {
     int valid_id = -1;
@@ -67,7 +65,7 @@ int Thread::getValidid()
     //printf("ValidID:%d\n", valid_id);
     return valid_id;
 }
-Thread* Thread::Create_thread(char* debugname)
+Thread *Thread::Create_thread(char *debugname, int priority)
 {
     IntStatus oldlevel = interrupt->SetLevel(IntOff);
     int id = Thread::getValidid();
@@ -80,7 +78,7 @@ Thread* Thread::Create_thread(char* debugname)
     }
     else
     {
-        Thread* t = new Thread(debugname, id);
+        Thread *t = new Thread(debugname, id, priority);
         (void)interrupt->SetLevel(oldlevel);
         return t;
     }
@@ -88,14 +86,15 @@ Thread* Thread::Create_thread(char* debugname)
 
 void Thread::TS()
 {
+    printf("----------------------TS----------------------\n");
+    printf("%15s%8s%8s%15s\n", "Name", "tid", "uid", "status");
     for (int i = 0; i < MAX_THREAD_NUM; i++)
     {
-        if(Thread::valid_threads[i]!=NULL)
+        if (Thread::valid_threads[i] != NULL)
         {
             Thread::valid_threads[i]->Print();
         }
     }
-    
 }
 //----------------------------------------------------------------------
 // Thread::~Thread
@@ -233,12 +232,19 @@ void Thread::Yield()
 
     DEBUG('t', "Yielding thread \"%s\"\n", getName());
 
+    // nextThread = scheduler->FindNextToRun();
+    // if (nextThread != NULL)
+    // {
+    //     scheduler->ReadyToRun(this);
+    //     scheduler->Run(nextThread);
+    // }
+    scheduler->ReadyToRun(this);
     nextThread = scheduler->FindNextToRun();
     if (nextThread != NULL)
     {
-        scheduler->ReadyToRun(this);
         scheduler->Run(nextThread);
     }
+    
     (void)interrupt->SetLevel(oldLevel);
 }
 

@@ -54,6 +54,7 @@
 // WATCH OUT IF THIS ISN'T BIG ENOUGH!!!!!
 #define StackSize (4 * 1024) // in words
 #define MAX_THREAD_NUM 128
+#define MAX_THREAD_PRIORITY 5
 
 // Thread state
 enum ThreadStatus
@@ -88,10 +89,11 @@ private:
   int machineState[MachineStateSize]; // all registers except for stackTop
   int uid;
   int tid;
+  int priority;
 
 public:
   static Thread *valid_threads[MAX_THREAD_NUM + 5];
-  Thread(char *debugName, int tid); // initialize a Thread
+  Thread(char *debugName, int tid, int priority); // initialize a Thread
   ~Thread();                        // deallocate a Thread
                                     // NOTE -- thread being deleted
                                     // must not be running when delete
@@ -101,24 +103,40 @@ public:
 
   void Fork(VoidFunctionPtr func, int arg); // Make thread run (*func)(arg)
   void Yield();                             // Relinquish the CPU if any
-      // other thread is runnable
-  void Sleep(); // Put the thread to sleep and
-      // relinquish the processor
-  void Finish(); // The thread is done executing
+                                            // other thread is runnable
+  void Sleep();                             // Put the thread to sleep and
+                                            // relinquish the processor
+  void Finish();                            // The thread is done executing
 
   void CheckOverflow(); // Check if thread has
-      // overflowed its stack
+                        // overflowed its stack
   void setStatus(ThreadStatus st) { status = st; }
   char *getName() { return (name); }
-  void Print() { printf("Thread \"%s\" with tid %d and uid %d running, status is \"%s\"\n", name, tid, uid, ThreadStatus_Name[status]); }
+  void Print() { printf("Thread %16s with tid %8d and uid %8d running, status is %10s\n", name, tid, uid, ThreadStatus_Name[status]); }
 
   int getUid() { return uid; }
   int getTid() { return tid; }
+  int getPriority() { return priority; }
   void setUid(int u) { uid = u; }
   void setTid(int t) { tid = t; }
+  void setPriority(int p) { 
+    if (p > MAX_THREAD_PRIORITY)
+    {
+      priority = MAX_THREAD_PRIORITY;
+    }
+    else if (p < 0)
+    {
+      priority = 0;
+    }
+    else
+    {
+      priority = p;
+    }
+    
+  }
 
   static int getValidid();
-  static Thread *Create_thread(char *debugname);
+  static Thread *Create_thread(char *debugname, int priority=8);
   static void TS();
 
 private:
