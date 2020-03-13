@@ -21,6 +21,7 @@
 #include "copyright.h"
 #include "scheduler.h"
 #include "system.h"
+#include <stdio.h>
 
 //----------------------------------------------------------------------
 // Scheduler::Scheduler
@@ -57,7 +58,7 @@ void Scheduler::ReadyToRun(Thread *thread)
     thread->setStatus(READY);
 
     readyList->SortedInsert((void *)thread, thread->getPriority());
-    if(thread != currentThread && thread->getPriority() > currentThread->getPriority())
+    if (thread != currentThread && thread->getPriority() < currentThread->getPriority())
     {
         currentThread->Yield();
     }
@@ -151,3 +152,4 @@ void Scheduler::Print()
     printf("Ready list contents:\n");
     readyList->Mapcar((VoidFunctionPtr)ThreadPrint);
 }
+

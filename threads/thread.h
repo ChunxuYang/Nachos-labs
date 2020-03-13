@@ -54,7 +54,7 @@
 // WATCH OUT IF THIS ISN'T BIG ENOUGH!!!!!
 #define StackSize (4 * 1024) // in words
 #define MAX_THREAD_NUM 128
-#define MAX_THREAD_PRIORITY 5
+#define MAX_THREAD_PRIORITY 10
 
 // Thread state
 enum ThreadStatus
@@ -94,10 +94,10 @@ private:
 public:
   static Thread *valid_threads[MAX_THREAD_NUM + 5];
   Thread(char *debugName, int tid, int priority); // initialize a Thread
-  ~Thread();                        // deallocate a Thread
-                                    // NOTE -- thread being deleted
-                                    // must not be running when delete
-                                    // is called
+  ~Thread();                                      // deallocate a Thread
+                                                  // NOTE -- thread being deleted
+                                                  // must not be running when delete
+                                                  // is called
 
   // basic thread operations
 
@@ -119,7 +119,8 @@ public:
   int getPriority() { return priority; }
   void setUid(int u) { uid = u; }
   void setTid(int t) { tid = t; }
-  void setPriority(int p) { 
+  void setPriority(int p)
+  {
     if (p > MAX_THREAD_PRIORITY)
     {
       priority = MAX_THREAD_PRIORITY;
@@ -132,11 +133,10 @@ public:
     {
       priority = p;
     }
-    
   }
 
   static int getValidid();
-  static Thread *Create_thread(char *debugname, int priority=8);
+  static Thread *Create_thread(char *debugname, int priority = 8);
   static void TS();
 
 private:

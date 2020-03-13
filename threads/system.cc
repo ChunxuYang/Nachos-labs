@@ -62,6 +62,15 @@ TimerInterruptHandler(int dummy)
         interrupt->YieldOnReturn();
 }
 
+static void RoundRobinHandler(int dummy)
+{
+    if (interrupt->getStatus() != IdleMode && stats->totalTicks - scheduler->getLastSwitchTick() >= TimerTicks)
+    {
+        printf("Hey!\n");
+        interrupt->YieldOnReturn();
+        scheduler->setLastSwitchTick(stats->totalTicks);
+    }
+}
 //----------------------------------------------------------------------
 // Initialize
 // 	Initialize Nachos global data structures.  Interpret command
@@ -77,7 +86,8 @@ void Initialize(int argc, char **argv)
     int argCount;
     char *debugArgs = "";
     bool randomYield = FALSE;
-    for (int i = 0; i < MAX_THREAD_NUM+5; i++)
+    bool Using_round_robin = FALSE;
+    for (int i = 0; i < MAX_THREAD_NUM + 5; i++)
     {
         Thread::valid_threads[i] = NULL;
     }
@@ -96,6 +106,7 @@ void Initialize(int argc, char **argv)
     for (argc--, argv++; argc > 0; argc -= argCount, argv += argCount)
     {
         argCount = 1;
+        
         if (!strcmp(*argv, "-d"))
         {
             if (argc == 1)
@@ -106,6 +117,14 @@ void Initialize(int argc, char **argv)
                 argCount = 2;
             }
         }
+        else if (!strcmp(*argv, "-rr"))
+        {
+            ASSERT(argc > 1);
+            Using_round_robin = TRUE;
+            argCount = 2;
+
+        }
+        
         else if (!strcmp(*argv, "-rs"))
         {
             ASSERT(argc > 1);
@@ -144,7 +163,9 @@ void Initialize(int argc, char **argv)
     scheduler = new Scheduler(); // initialize the ready queue
     if (randomYield)             // start the timer (if needed)
         timer = new Timer(TimerInterruptHandler, 0, randomYield);
-
+    else if (Using_round_robin)
+        timer = new Timer(RoundRobinHandler, 0, FALSE);
+    
     threadToBeDestroyed = NULL;
 
     // We didn't explicitly allocate the current thread we are running in.
