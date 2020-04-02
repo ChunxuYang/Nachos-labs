@@ -78,7 +78,7 @@ public:
                                 // holds this lock.  Useful for
                                 // checking in Release, and in
                                 // Condition variable ops below.
-
+  bool isLocked() {return (Holding_Thread != NULL);}
 private:
   char *name; // for debugging
   Semaphore* semaphore;
@@ -135,6 +135,27 @@ public:
 
 private:
   char *name;
+  List* waitingList;
   // plus some other stuff you'll need to define
 };
+
+class ReaderWriterLock
+{
+private:
+  char *name;
+  int BlockingReaders;
+  Lock* mutex_reader;
+  Lock* mutex_writer;
+public:
+  ReaderWriterLock(char *debugName);
+  ~ReaderWriterLock();
+  char *getName() {return name;}
+  void ReaderAcquire();
+  void ReaderRelease();
+  void WriterAcquire();
+  void WriterRelease();
+};
+
+
+
 #endif // SYNCH_H

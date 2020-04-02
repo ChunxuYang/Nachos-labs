@@ -99,29 +99,137 @@ void Semaphore::V()
 // Dummy functions -- so we can compile our later assignments
 // Note -- without a correct implementation of Condition::Wait(),
 // the test case in the network assignment won't work!
-Lock::Lock(char *debugName) {
+Lock::Lock(char *debugName)
+{
     name = debugName;
     semaphore = new Semaphore("lock", 1);
 }
-Lock::~Lock() {
-    delete(semaphore);
+Lock::~Lock()
+{
+    delete (semaphore);
 }
-void Lock::Acquire() {
+void Lock::Acquire()
+{
     IntStatus oldLevel = interrupt->SetLevel(IntOff);
     semaphore->P();
     Holding_Thread = currentThread;
     (void)interrupt->SetLevel(oldLevel);
 }
-void Lock::Release() {
+void Lock::Release()
+{
     IntStatus oldLevel = interrupt->SetLevel(IntOff);
     ASSERT(Holding_Thread == currentThread);
     semaphore->V();
     currentThread = NULL;
     (void)interrupt->SetLevel(oldLevel);
 }
+bool Lock::isHeldByCurrentThread()
+{
+    return (currentThread == Holding_Thread);
+}
 
-Condition::Condition(char *debugName) {}
-Condition::~Condition() {}
-void Condition::Wait(Lock *conditionLock) { ASSERT(FALSE); }
-void Condition::Signal(Lock *conditionLock) {}
-void Condition::Broadcast(Lock *conditionLock) {}
+Condition::Condition(char *debugName)
+{
+    name = debugName;
+    waitingList = new List();
+}
+Condition::~Condition()
+{
+    delete waitingList;
+}
+void Condition::Wait(Lock *conditionLock)
+{
+    IntStatus oldLevel = interrupt->SetLevel(IntOff);
+    ASSERT(conditionLock->isHeldByCurrentThread());
+    ASSERT(conditionLock->isLocked());
+
+    conditionLock->Release();
+    waitingList->Append(currentThread);
+    currentThread->Sleep();
+
+    conditionLock->Acquire();
+    (void)interrupt->SetLevel(oldLevel);
+}
+void Condition::Signal(Lock *conditionLock)
+{
+    IntStatus oldLevel = interrupt->SetLevel(IntOff);
+
+    ASSERT(conditionLock->isHeldByCurrentThread());
+    if (!waitingList->IsEmpty())
+    {
+        Thread *thread = (Thread *)waitingList->Remove();
+        scheduler->ReadyToRun(thread);
+    }
+
+    (void)interrupt->SetLevel(oldLevel);
+}
+void Condition::Broadcast(Lock *conditionLock)
+{
+    IntStatus oldLevel = interrupt->SetLevel(IntOff);
+
+    ASSERT(conditionLock->isHeldByCurrentThread());
+    while (!waitingList->IsEmpty())
+    {
+        Thread *thread = (Thread *)waitingList->Remove();
+        scheduler->ReadyToRun(thread);
+    }
+
+    (void)interrupt->SetLevel(oldLevel);
+}
+
+ReaderWriterLock::ReaderWriterLock(char *debugName)
+{
+    name = debugName;
+    BlockingReaders = 0;
+    mutex_reader = new Lock("Reader Mutex");
+    mutex_writer = new Lock("Writer Mutex");
+}
+
+ReaderWriterLock::~ReaderWriterLock()
+{
+    delete mutex_writer;
+    delete mutex_reader;
+}
+
+void ReaderWriterLock::ReaderAcquire()
+{
+    IntStatus oldLevel = interrupt->SetLevel(IntOff);
+
+    mutex_reader->Acquire();
+    BlockingReaders++;
+
+    if (BlockingReaders == 1)
+    {
+        mutex_writer->Acquire();
+    }
+    mutex_reader->Release();
+
+    (void)interrupt->SetLevel(oldLevel);
+}
+
+void ReaderWriterLock::ReaderRelease()
+{
+    IntStatus oldLevel = interrupt->SetLevel(IntOff);
+    mutex_reader->Acquire();
+    BlockingReaders--;
+    if (BlockingReaders == 0)
+    {
+        mutex_writer->Release();
+    }
+    mutex_reader->Release();
+    (void)interrupt->SetLevel(oldLevel);
+}
+
+void ReaderWriterLock::WriterAcquire()
+{
+    IntStatus oldLevel = interrupt->SetLevel(IntOff);
+    mutex_writer->Acquire();
+    (void)interrupt->SetLevel(oldLevel);
+}
+
+void ReaderWriterLock::WriterRelease()
+{
+    IntStatus oldLevel = interrupt->SetLevel(IntOff);
+    mutex_writer->Release();
+    (void)interrupt->SetLevel(oldLevel);
+}

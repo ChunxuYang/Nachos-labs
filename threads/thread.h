@@ -112,7 +112,7 @@ public:
                         // overflowed its stack
   void setStatus(ThreadStatus st) { status = st; }
   char *getName() { return (name); }
-  void Print() { printf("Thread %16s with tid %8d and uid %8d running, status is %10s\n", name, tid, uid, ThreadStatus_Name[status]); }
+  void Print() { printf("%15s%8d%8d%15s\n", name, tid, uid, ThreadStatus_Name[status]); }
 
   int getUid() { return uid; }
   int getTid() { return tid; }
