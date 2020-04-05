@@ -211,4 +211,9 @@ unsigned short ShortToHost(unsigned short shortword);
 unsigned int WordToMachine(unsigned int word);
 unsigned short ShortToMachine(unsigned short shortword);
 
+
+extern int my_ref_count;
+extern int my_miss_count;
 #endif // MACHINE_H
+
+

@@ -37,7 +37,9 @@
 // Routines for converting Words and Short Words to and from the
 // simulated machine's format of little endian.  These end up
 // being NOPs when the host machine is also little endian (DEC and Intel).
-
+extern Machine* machine;
+int my_ref_count = 0;
+int my_miss_count = 0;
 unsigned int
 WordToHost(unsigned int word)
 {
@@ -97,6 +99,7 @@ bool Machine::ReadMem(int addr, int size, int *value)
 	if (exception != NoException)
 	{
 		machine->RaiseException(exception, addr);
+
 		return FALSE;
 	}
 	switch (size)
@@ -148,6 +151,7 @@ bool Machine::WriteMem(int addr, int size, int value)
 	if (exception != NoException)
 	{
 		machine->RaiseException(exception, addr);
+		// my_miss_count++;
 		return FALSE;
 	}
 	switch (size)
@@ -204,7 +208,7 @@ Machine::Translate(int virtAddr, int *physAddr, int size, bool writing)
 	}
 
 	// we must have either a TLB or a page table, but not both!
-	ASSERT(tlb == NULL || pageTable == NULL);
+	// ASSERT(tlb == NULL || pageTable == NULL);
 	ASSERT(tlb != NULL || pageTable != NULL);
 
 	// calculate the virtual page number, and offset within the page,
@@ -230,14 +234,17 @@ Machine::Translate(int virtAddr, int *physAddr, int size, bool writing)
 	}
 	else
 	{
+		my_ref_count++;
 		for (entry = NULL, i = 0; i < TLBSize; i++)
 			if (tlb[i].valid && (tlb[i].virtualPage == vpn))
 			{
 				entry = &tlb[i]; // FOUND!
+				tlb[i].lastUsedTime = stats->totalTicks;
 				break;
 			}
 		if (entry == NULL)
 		{ // not found
+			// my_miss_count++;
 			DEBUG('a', "*** no valid TLB entry found for this virtual page!\n");
 			return PageFaultException; // really, this is a TLB fault,
 									   // the page may be in memory,

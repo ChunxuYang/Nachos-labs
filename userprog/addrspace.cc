@@ -96,6 +96,7 @@ AddrSpace::AddrSpace(OpenFile *executable)
 	pageTable[i].readOnly = FALSE;  // if the code segment was entirely on 
 					// a separate page, we could set its 
 					// pages to be read-only
+    pageTable[i].lastUsedTime = stats->totalTicks;
     }
     
 // zero out the entire address space, to zero the unitialized data segment 
@@ -169,7 +170,14 @@ AddrSpace::InitRegisters()
 //----------------------------------------------------------------------
 
 void AddrSpace::SaveState() 
-{}
+{
+#ifdef USE_TLB // Lab4: Clean up TLB
+    DEBUG('T', "Clean up TLB due to Context Switch!\n");
+    for (int i = 0; i < TLBSize; i++) {
+        machine->tlb[i].valid = FALSE;
+    }
+#endif
+}
 
 //----------------------------------------------------------------------
 // AddrSpace::RestoreState

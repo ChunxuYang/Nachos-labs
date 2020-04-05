@@ -9,7 +9,7 @@
 
 #include "syscall.h"
 
-#define Dim 	20	/* sum total of the arrays doesn't fit in 
+#define Dim 	5	/* sum total of the arrays doesn't fit in 
 			 * physical memory 
 			 */
 
