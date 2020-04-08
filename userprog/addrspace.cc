@@ -75,14 +75,17 @@ AddrSpace::AddrSpace(OpenFile *executable)
     size = noffH.code.size + noffH.initData.size + noffH.uninitData.size + UserStackSize; // we need to increase the size
                                                                                           // to leave room for the stack
     numPages = divRoundUp(size, PageSize);
+    
     size = numPages * PageSize;
+    
 #ifndef DEMAND_PAGING
+   
     ASSERT(numPages <= NumPhysPages); // check we're not trying
                                       // to run anything too big --
                                       // at least until we have
                                       // virtual memory
 #else
-
+    
     // first, set up the translation
     DEBUG('a', "Creating virtual memory.\n");
     bool create_memory_success = fileSystem->Create("VirtualMemory", size);
@@ -93,6 +96,8 @@ AddrSpace::AddrSpace(OpenFile *executable)
     }
     
 #endif
+ 
+#ifndef INVERTED_PAGETABLE
     DEBUG('a', "Initializing address space (page table), num pages %d, size %d\n",
           numPages, size);
     pageTable = new TranslationEntry[numPages];
@@ -102,7 +107,12 @@ AddrSpace::AddrSpace(OpenFile *executable)
         pageTable[i].virtualPage = i; // for now, virtual page # = phys page #
                                       //pageTable[i].physicalPage = i;
 #ifndef DEMAND_PAGING
+#if USE_BITMAP
         pageTable[i].physicalPage = machine->allocateFrame();
+#else
+        pageTable[i].physicalPage = i;
+#endif
+        pageTable[i].valid = TRUE;
 #else
         pageTable[i].valid = FALSE;
 #endif
@@ -113,15 +123,30 @@ AddrSpace::AddrSpace(OpenFile *executable)
                                        // pages to be read-only
         pageTable[i].lastUsedTime = stats->totalTicks;
     }
-#if !DEMAND_PAGING
+#if !DEMAND_PAGING && USE_BITMAP
     DEBUG('M', "Bitmap after allocate: %08X\n", machine->bitmap);
 #endif
+#else
+
+    for (i = 0; i < numPages; i++) {
+        machine->pageTable[i].physicalPage = machine->allocateFrame(); // Currently don't support demand paging
+        //printf("GETHERE5 %d\n", numPages);
+        machine->pageTable[i].valid = TRUE;
+        machine->pageTable[i].use = FALSE;
+        machine->pageTable[i].dirty = FALSE;
+        machine->pageTable[i].readOnly = FALSE;
+        machine->pageTable[i].lastUsedTime = stats->totalTicks;
+
+        machine->pageTable[i].threadID = currentThread->getTid(); // The additional part of inverted page table
+    }
+    DEBUG('M', "Initialized memory for thread \"%s\".\n", currentThread->getName());
+#endif // INVERTED_PAGETABLE
 
     // zero out the entire address space, to zero the unitialized data segment
     // and the stack segment
 #ifndef DEMAND_PAGING
     bzero(machine->mainMemory, size);
-
+#if USE_BITMAP
     if (noffH.code.size > 0)
     {
         DEBUG('a', "Initializing code segment, at 0x%x, size %d\n",
@@ -136,6 +161,21 @@ AddrSpace::AddrSpace(OpenFile *executable)
         executable->ReadAt(&(machine->mainMemory[noffH.initData.virtualAddr]),
                            noffH.initData.size, noffH.initData.inFileAddr);
     }
+#else
+    // then, copy in the code and data segments into memory
+    if (noffH.code.size > 0) {
+        DEBUG('a', "Initializing code segment, at 0x%x, size %d\n", 
+			noffH.code.virtualAddr, noffH.code.size);
+        executable->ReadAt(&(machine->mainMemory[noffH.code.virtualAddr]),
+			noffH.code.size, noffH.code.inFileAddr);
+    }
+    if (noffH.initData.size > 0) {
+        DEBUG('a', "Initializing data segment, at 0x%x, size %d\n", 
+			noffH.initData.virtualAddr, noffH.initData.size);
+        executable->ReadAt(&(machine->mainMemory[noffH.initData.virtualAddr]),
+			noffH.initData.size, noffH.initData.inFileAddr);
+    }
+#endif // USE_BITMAP
 #else
     bzero(machine->mainMemory, MemorySize);
     DEBUG('a', "Demand paging: Copying executable to Virtual Memory...\n");
@@ -241,8 +281,10 @@ void AddrSpace::SaveState()
 
 void AddrSpace::RestoreState()
 {
+#ifndef INVERTED_PAGETABLE
     machine->pageTable = pageTable;
     machine->pageTableSize = numPages;
+#endif
 }
 void AddrSpace::PrintState()
 {
@@ -259,7 +301,8 @@ void AddrSpace::PrintState()
         printf("%d\t", pageTable[i].readOnly);
         printf("\n");
     }
-
+#if USE_BITMAP
     DEBUG('M', "Current Bitmap: %08X\n", machine->bitmap);
+#endif
     printf("=================================\n");
 }

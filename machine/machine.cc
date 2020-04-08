@@ -54,12 +54,15 @@ static void CheckEndian()
 Machine::Machine(bool debug)
 {
     int i;
-
+#if USE_BITMAP && INVERTED_PAGETABLE
+    printf("Not Both INVERTED_PAGETABLE and Bitmap!\n");
+#endif
     for (i = 0; i < NumTotalRegs; i++)
         registers[i] = 0;
     mainMemory = new char[MemorySize];
     for (i = 0; i < MemorySize; i++)
         mainMemory[i] = 0;
+    
 #ifdef USE_TLB
     tlb = new TranslationEntry[TLBSize];
     for (i = 0; i < TLBSize; i++)
@@ -70,7 +73,31 @@ Machine::Machine(bool debug)
     tlb = NULL;
     pageTable = NULL;
 #endif
-    bitmap = 0;
+
+#ifndef INVERTED_PAGETABLE
+    // Lab4: Global data structure for memory management
+#if USE_BITMAP
+    bitmap = 0; // Initialize
+#endif
+#else // Using Inverted Page Table
+    
+    pageTable = new TranslationEntry[NumPhysPages];
+    // Initialize Inverted Page Table
+
+    
+    for (i = 0; i < NumPhysPages; i++)
+    {
+        pageTable[i].physicalPage = i;
+        pageTable[i].virtualPage = i;
+        pageTable[i].valid = FALSE;
+        pageTable[i].dirty = FALSE;
+        pageTable[i].readOnly = FALSE;
+        pageTable[i].threadID = -1;
+    }
+    
+    pageTableSize = MemorySize;
+#endif
+
     singleStep = debug;
     CheckEndian();
 }
@@ -215,6 +242,7 @@ void Machine::WriteRegister(int num, int value)
 
 int Machine::allocateFrame(void)
 {
+#if USE_BITMAP
     int shift;
     for (shift = 0; shift < NumPhysPages; shift++)
     {
@@ -222,13 +250,25 @@ int Machine::allocateFrame(void)
         {                           // found empty bit
             bitmap |= 0x1 << shift; // set the bit to used
             DEBUG('M', "Allocate physical page frame: %d\n", shift);
-            printf(">>>>> allocate %d\n", shift);
+            //printf(">>>>> allocate %d\n", shift);
             return shift;
         }
     }
     DEBUG('M', "Out of physical page frame!\n", shift);
     //printf(">>>>> allocate %d\n", -1);
     return -1;
+#elif INVERTED_PAGETABLE
+    for (int i = 0; i < NumPhysPages; i++)
+    {
+        if (!pageTable[i].valid)
+        {
+            return i;
+        }
+    }
+    printf("Out of physical page frame!\n");
+    ASSERT(FALSE);
+    return -1;
+#endif
 }
 
 //----------------------------------------------------------------------
@@ -240,6 +280,7 @@ int Machine::allocateFrame(void)
 //----------------------------------------------------------------------
 void Machine::freeMem(void)
 {
+#if USE_BITMAP
     for (int i = 0; i < pageTableSize; i++)
     {
         if (pageTable[i].valid)
@@ -250,4 +291,15 @@ void Machine::freeMem(void)
         }
     }
     DEBUG('M', "Bitmap after freed: %08X\n", bitmap);
+#elif INVERTED_PAGETABLE
+    for (int i = 0; i < NumPhysPages; i++)
+    {
+        if (pageTable[i].threadID == currentThread->getTid())
+        {
+            pageTable[i].valid = FALSE;
+            DEBUG('M', "Free physical page frame: %d\n", i);
+        }
+    }
+    DEBUG('M', "Freed the memory hold by thread \"%s\".\n", currentThread->getName());
+#endif
 }

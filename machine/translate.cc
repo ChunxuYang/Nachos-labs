@@ -218,6 +218,7 @@ Machine::Translate(int virtAddr, int *physAddr, int size, bool writing)
 
 	if (tlb == NULL)
 	{ // => page table => vpn is index into table
+#ifndef INVERTED_PAGETABLE
 		if (vpn >= pageTableSize)
 		{
 			DEBUG('a', "virtual page # %d too large for page table size %d!\n",
@@ -230,6 +231,24 @@ Machine::Translate(int virtAddr, int *physAddr, int size, bool writing)
 				  virtAddr, pageTableSize);
 			return PageFaultException;
 		}
+#else
+		if (vpn >= pageTableSize)
+		{
+			DEBUG('a', "virtual page # %d too large for page table size %d!\n",
+					virtAddr, pageTableSize);
+			return AddressErrorException;
+		}
+		else if (!pageTable[vpn].valid)
+		{
+			DEBUG('a', "Virtual page # %d is invalid!\n", vpn);
+			return PageFaultException;
+		}
+		else if(!(pageTable[vpn].threadID == currentThread->getTid()))
+		{
+			printf("A thread is accessing other thread's address space\n");
+			ASSERT(FALSE);
+		}
+#endif
 		entry = &pageTable[vpn];
 	}
 	else

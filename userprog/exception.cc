@@ -57,6 +57,7 @@ int TLB_LRU();
 int TLB_RAND();
 void PrintTLB();
 void PrintTLBStatus();
+TranslationEntry PageFaultHandler(int vpn);
 int PageReplacement(int vpn);
 enum TLB_ALGO
 {
@@ -65,42 +66,21 @@ enum TLB_ALGO
     RAND
 };
 enum TLB_ALGO tlb_algo = RAND;
-TranslationEntry PageFaultHandler(int vpn)
-{
-    int pageFrame = machine->allocateFrame();
-    if (pageFrame == -1)
-    {
-        pageFrame = PageReplacement(vpn);
-    }
-    machine->pageTable[vpn].physicalPage = pageFrame;
-    
-    DEBUG('a', "Loading page from Virtual Memory\n");
-    OpenFile *vm = fileSystem->Open("VirtualMemory");
-    if(vm == NULL) printf("vm NULL\n");
-    ASSERT(vm != NULL);
-    
-    vm->ReadAt(&(machine->mainMemory[pageFrame * PageSize]), PageSize, vpn * PageSize);
-    
-    delete vm; // close the file
 
-    // Set the page attributes
-    machine->pageTable[vpn].valid = TRUE;
-    machine->pageTable[vpn].use = FALSE;
-    machine->pageTable[vpn].dirty = FALSE;
-    machine->pageTable[vpn].readOnly = FALSE;
-
-    //currentThread->space->PrintState(); // debug with -d M to show bitmap
-}
 void TLBHandler(int addr)
 {
     my_miss_count++;
     int vpn = (unsigned)addr / PageSize;
     TranslationEntry page = machine->pageTable[vpn];
+#ifndef DEMAND_PAGING
+ASSERT(page.valid);
+#else // Lab4: Demand paging
     if (!page.valid)
     {
         DEBUG('S', "==> Page Miss\n");
         page = PageFaultHandler(vpn);
     }
+#endif
     int pos = -1;
     for (int i = 0; i < TLBSize; i++)
     {
@@ -247,7 +227,9 @@ void AddressSpaceControlHandler(int type)
         }
         if (currentThread->space != NULL)
         {
+#if USE_BITMAP || INVERTED_PAGETABLE
             machine->freeMem();
+#endif
 
             delete currentThread->space;
             currentThread->space = NULL;
@@ -263,6 +245,38 @@ void IncrementPCRegs()
     machine->WriteRegister(PrevPCReg, machine->ReadRegister(PCReg));
     machine->WriteRegister(PCReg, machine->ReadRegister(NextPCReg));
     machine->WriteRegister(NextPCReg, machine->ReadRegister(NextPCReg) + 4);
+}
+
+#ifdef DEMAND_PAGING
+TranslationEntry PageFaultHandler(int vpn)
+{
+#ifdef USE_BITMAP
+    int pageFrame = machine->allocateFrame();
+#else
+    ASSERT(FALSE);
+#endif
+    if (pageFrame == -1)
+    {
+        pageFrame = PageReplacement(vpn);
+    }
+    machine->pageTable[vpn].physicalPage = pageFrame;
+    
+    DEBUG('a', "Loading page from Virtual Memory\n");
+    OpenFile *vm = fileSystem->Open("VirtualMemory");
+    if(vm == NULL) printf("vm NULL\n");
+    ASSERT(vm != NULL);
+    
+    vm->ReadAt(&(machine->mainMemory[pageFrame * PageSize]), PageSize, vpn * PageSize);
+    
+    delete vm; // close the file
+
+    // Set the page attributes
+    machine->pageTable[vpn].valid = TRUE;
+    machine->pageTable[vpn].use = FALSE;
+    machine->pageTable[vpn].dirty = FALSE;
+    machine->pageTable[vpn].readOnly = FALSE;
+
+    //currentThread->space->PrintState(); // debug with -d M to show bitmap
 }
 int
 PageReplacement(int vpn)
@@ -293,6 +307,7 @@ PageReplacement(int vpn)
     }
     return pageFrame;
 }
+#endif
 // int PageReplacement(int vpn)
 // {
 //     int pageFrame = -1;
