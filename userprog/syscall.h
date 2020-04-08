@@ -124,6 +124,13 @@ void Fork(void (*func)());
  */
 void Yield();		
 
+void AddressSpaceControlHandler(int type); // Exit, Exec, Join
+void FileSystemHandler(int type); // Create, Open, Write, Read, Close
+void UserLevelThreadsHandler(int type); // Fork, Yield
+
+void IncrementPCRegs();
+
 #endif /* IN_ASM */
+
 
 #endif /* SYSCALL_H */

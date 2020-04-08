@@ -9,7 +9,7 @@
 # All rights reserved.  See copyright.h for copyright notice and limitation 
 # of liability and disclaimer of warranty provisions.
 
-DEFINES = -DUSER_PROGRAM -DFILESYS_NEEDED -DFILESYS_STUB -DUSE_TLB
+DEFINES = -DUSER_PROGRAM -DFILESYS_NEEDED -DFILESYS_STUB -DUSE_TLB -DDEMAND_PAGING
 INCPATH = -I../bin -I../filesys -I../userprog -I../threads -I../machine
 HFILES = $(THREAD_H) $(USERPROG_H)
 CFILES = $(THREAD_C) $(USERPROG_C)
@@ -370,7 +370,7 @@ exception.o: ../userprog/exception.cc ../threads/copyright.h \
  ../userprog/addrspace.h ../filesys/filesys.h ../filesys/openfile.h \
  ../threads/scheduler.h ../threads/list.h ../machine/interrupt.h \
  ../threads/list.h ../machine/stats.h ../machine/timer.h \
- ../userprog/syscall.h
+ ../userprog/syscall.h ../filesys/openfile.h
 progtest.o: ../userprog/progtest.cc ../threads/copyright.h \
  ../threads/system.h ../threads/copyright.h ../threads/utility.h \
  ../threads/bool.h ../machine/sysdep.h /usr/include/stdio.h \

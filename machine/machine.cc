@@ -64,13 +64,13 @@ Machine::Machine(bool debug)
     tlb = new TranslationEntry[TLBSize];
     for (i = 0; i < TLBSize; i++)
         tlb[i].valid = FALSE;
-        tlb[i].lastUsedTime = stats->totalTicks;
+    tlb[i].lastUsedTime = stats->totalTicks;
     pageTable = NULL;
 #else // use linear page table
     tlb = NULL;
     pageTable = NULL;
 #endif
-
+    bitmap = 0;
     singleStep = debug;
     CheckEndian();
 }
@@ -211,4 +211,43 @@ void Machine::WriteRegister(int num, int value)
     ASSERT((num >= 0) && (num < NumTotalRegs));
     // DEBUG('m', "WriteRegister %d, value %d\n", num, value);
     registers[num] = value;
+}
+
+int Machine::allocateFrame(void)
+{
+    int shift;
+    for (shift = 0; shift < NumPhysPages; shift++)
+    {
+        if (!(bitmap >> shift & 0x1))
+        {                           // found empty bit
+            bitmap |= 0x1 << shift; // set the bit to used
+            DEBUG('M', "Allocate physical page frame: %d\n", shift);
+            printf(">>>>> allocate %d\n", shift);
+            return shift;
+        }
+    }
+    DEBUG('M', "Out of physical page frame!\n", shift);
+    //printf(">>>>> allocate %d\n", -1);
+    return -1;
+}
+
+//----------------------------------------------------------------------
+// Machine::freeMem
+//    Bitmap
+//   	Free current page table physical page frames.
+//    Inverted Page Table
+//   	Free current thread's physical page frames.
+//----------------------------------------------------------------------
+void Machine::freeMem(void)
+{
+    for (int i = 0; i < pageTableSize; i++)
+    {
+        if (pageTable[i].valid)
+        { // Free the "used" page frame
+            int pageFrameNum = pageTable[i].physicalPage;
+            bitmap &= ~(0x1 << pageFrameNum);
+            DEBUG('M', "Free physical page frame: %d\n", pageFrameNum);
+        }
+    }
+    DEBUG('M', "Bitmap after freed: %08X\n", bitmap);
 }

@@ -134,10 +134,11 @@ public:
       priority = p;
     }
   }
-
   static int getValidid();
   static Thread *Create_thread(char *debugname, int priority = 8);
   static void TS();
+  int getExitStatus() const { return exitStatus; }
+  void setExitStatus(int val) { exitStatus = val; }
 
 private:
   // some of the private data for this class is listed above
@@ -149,6 +150,7 @@ private:
   char *name;
 
   void StackAllocate(VoidFunctionPtr func, int arg);
+  int exitStatus;
   // Allocate a stack for thread.
   // Used internally by Fork()
 

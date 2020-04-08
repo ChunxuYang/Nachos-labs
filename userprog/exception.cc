@@ -25,6 +25,7 @@
 #include "system.h"
 #include "syscall.h"
 #include "machine.h"
+#include "openfile.h"
 
 //----------------------------------------------------------------------
 // ExceptionHandler
@@ -49,13 +50,14 @@
 //	are in machine.h.
 //----------------------------------------------------------------------
 extern Machine *machine;
-
+extern FileSystem *fileSystem;
 int TLB_FIFO();
 int TLB_Clock();
 int TLB_LRU();
 int TLB_RAND();
 void PrintTLB();
 void PrintTLBStatus();
+int PageReplacement(int vpn);
 enum TLB_ALGO
 {
     FIFO,
@@ -63,10 +65,42 @@ enum TLB_ALGO
     RAND
 };
 enum TLB_ALGO tlb_algo = RAND;
+TranslationEntry PageFaultHandler(int vpn)
+{
+    int pageFrame = machine->allocateFrame();
+    if (pageFrame == -1)
+    {
+        pageFrame = PageReplacement(vpn);
+    }
+    machine->pageTable[vpn].physicalPage = pageFrame;
+    
+    DEBUG('a', "Loading page from Virtual Memory\n");
+    OpenFile *vm = fileSystem->Open("VirtualMemory");
+    if(vm == NULL) printf("vm NULL\n");
+    ASSERT(vm != NULL);
+    
+    vm->ReadAt(&(machine->mainMemory[pageFrame * PageSize]), PageSize, vpn * PageSize);
+    
+    delete vm; // close the file
+
+    // Set the page attributes
+    machine->pageTable[vpn].valid = TRUE;
+    machine->pageTable[vpn].use = FALSE;
+    machine->pageTable[vpn].dirty = FALSE;
+    machine->pageTable[vpn].readOnly = FALSE;
+
+    //currentThread->space->PrintState(); // debug with -d M to show bitmap
+}
 void TLBHandler(int addr)
 {
     my_miss_count++;
     int vpn = (unsigned)addr / PageSize;
+    TranslationEntry page = machine->pageTable[vpn];
+    if (!page.valid)
+    {
+        DEBUG('S', "==> Page Miss\n");
+        page = PageFaultHandler(vpn);
+    }
     int pos = -1;
     for (int i = 0; i < TLBSize; i++)
     {
@@ -109,28 +143,45 @@ void ExceptionHandler(ExceptionType which)
     {
         if (machine->tlb == NULL)
         {
-            DEBUG('m', "=> Page table fault.\n");
+            DEBUG('S', "=> Page table fault.\n");
         }
         else
         {
-            DEBUG('m', "=> TLB Miss.\n");
+            DEBUG('S', "=> TLB Miss.\n");
             int missAddress = machine->ReadRegister(BadVAddrReg);
             TLBHandler(missAddress);
         }
         return;
     }
 
-    if ((which == SyscallException) && (type == SC_Halt))
+    if (which == SyscallException)
     {
-        DEBUG('a', "Shutdown, initiated by user program.\n");
-        PrintTLBStatus();
-        interrupt->Halt();
+        if (type == SC_Halt)
+        {
+            DEBUG('a', "Shutdown, initiated by user program.\n");
+            PrintTLBStatus();
+            interrupt->Halt();
+        }
+        else if (type == SC_Exit || type == SC_Exec || type == SC_Join)
+        {
+            AddressSpaceControlHandler(type);
+        }
+        else if (type == SC_Create || type == SC_Open || type == SC_Write || type == SC_Read || type == SC_Close)
+        {
+            // File System System Calls
+            FileSystemHandler(type);
+        }
+        else if (type == SC_Fork || type == SC_Yield)
+        {
+            // User-level Threads System Calls
+            UserLevelThreadsHandler(type);
+        }
+        IncrementPCRegs();
+        return;
     }
-    else
-    {
-        printf("Unexpected user mode exception %d %d\n", which, type);
-        ASSERT(FALSE);
-    }
+
+    printf("Unexpected user mode exception %d %d\n", which, type);
+    ASSERT(FALSE);
 }
 
 int TLB_FIFO()
@@ -158,7 +209,7 @@ int TLB_LRU()
 }
 int TLB_RAND()
 {
-    int index = ((13+stats->totalTicks)*23)%TLBSize;
+    int index = ((13 + stats->totalTicks) * 23) % TLBSize;
     return index;
 }
 void PrintTLBStatus()
@@ -167,7 +218,7 @@ void PrintTLBStatus()
     printf("==> Total reference: %d\n", my_ref_count);
     printf("==> Hits: %d\n", my_ref_count - my_miss_count);
     printf("==> Miss: %d\n", my_miss_count);
-    printf("==> Hit Rate: %.3lf%%\n", ((double)(my_ref_count-my_miss_count) * 100) / (my_ref_count));
+    printf("==> Hit Rate: %.3lf%%\n", ((double)(my_ref_count - my_miss_count) * 100) / (my_ref_count));
 #endif
 }
 void PrintTLB()
@@ -178,3 +229,105 @@ void PrintTLB()
     }
     printf("_______\n");
 }
+
+void AddressSpaceControlHandler(int type)
+{
+    if (type = SC_Exit)
+    {
+        PrintTLBStatus();
+        int status = machine->ReadRegister(4);
+        currentThread->setExitStatus(status);
+        if (status == 0)
+        {
+            DEBUG('S', "User program exit normally.\n");
+        }
+        else
+        {
+            DEBUG('S', "User program exit with status %d.\n", status);
+        }
+        if (currentThread->space != NULL)
+        {
+            machine->freeMem();
+
+            delete currentThread->space;
+            currentThread->space = NULL;
+        }
+        currentThread->Finish();
+    }
+}
+void FileSystemHandler(int type) {}       // Create, Open, Write, Read, Close
+void UserLevelThreadsHandler(int type) {} // Fork, Yield
+
+void IncrementPCRegs()
+{
+    machine->WriteRegister(PrevPCReg, machine->ReadRegister(PCReg));
+    machine->WriteRegister(PCReg, machine->ReadRegister(NextPCReg));
+    machine->WriteRegister(NextPCReg, machine->ReadRegister(NextPCReg) + 4);
+}
+int
+PageReplacement(int vpn)
+{
+    int pageFrame = -1;
+    for (int temp_vpn = 0; temp_vpn < machine->pageTableSize, temp_vpn != vpn; temp_vpn++) {
+        if (machine->pageTable[temp_vpn].valid) {
+            if (!machine->pageTable[temp_vpn].dirty) {
+                pageFrame = machine->pageTable[temp_vpn].physicalPage;
+                break;
+            }
+        }
+    }
+    if (pageFrame == -1) { // No non-dirty entry
+        for (int replaced_vpn = 0; replaced_vpn < machine->pageTableSize, replaced_vpn != vpn; replaced_vpn++) {
+            if (machine->pageTable[replaced_vpn].valid) {
+                machine->pageTable[replaced_vpn].valid = FALSE;
+                pageFrame = machine->pageTable[replaced_vpn].physicalPage;
+
+                // Store the page back to disk
+                OpenFile *vm = fileSystem->Open("VirtualMemory");
+                //ASSERT_MSG(vm != NULL, "fail to open virtual memory");
+                vm->WriteAt(&(machine->mainMemory[pageFrame*PageSize]), PageSize, replaced_vpn*PageSize);
+                delete vm; // close file
+                break;
+            }
+        }
+    }
+    return pageFrame;
+}
+// int PageReplacement(int vpn)
+// {
+//     int pageFrame = -1;
+//     for (int i = 0; i < machine->pageTableSize, i != vpn; i++)
+//     {
+//         if (machine->pageTable[i].valid)
+//         {
+//             if (!machine->pageTable[i].dirty)
+//             {
+//                 pageFrame = machine->pageTable[i].physicalPage;
+//                 break;
+//             }
+//         }
+//     }
+//     if(pageFrame == -1)
+//     {
+//         for (int i = 0; i < machine->pageTableSize, i != vpn; i++)
+//         {
+//             if (machine->pageTable[i].valid)
+//             {
+//                 machine->pageTable[i].valid = FALSE;
+//                 pageFrame = machine->pageTable[i].physicalPage;
+
+//                 OpenFile *vm = fileSystem->Open("VirtualMemory");
+//                 if(vm == NULL) printf("vm NULL\n");
+//                 ASSERT(vm != NULL);
+//                 vm->WriteAt(&(machine->mainMemory[pageFrame*PageSize]), PageSize, i*PageSize);
+//                 delete vm; // close file
+//                 break;
+//             }
+            
+//         }
+        
+//     }
+//     printf(">>>>> Page Frame %d\n", pageFrame);
+//     return pageFrame;
+    
+// }
