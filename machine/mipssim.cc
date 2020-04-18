@@ -35,12 +35,19 @@ Machine::Run()
     if(DebugIsEnabled('m'))
         printf("Starting thread \"%s\" at time %d\n",
 	       currentThread->getName(), stats->totalTicks);
+
     interrupt->setStatus(UserMode);
+
     for (;;) {
+		/*
+		if (end == 1) {
+			end = 0;
+			break;
+		}*/
         OneInstruction(instr);
-	interrupt->OneTick();
-	if (singleStep && (runUntilTime <= stats->totalTicks))
-	  Debugger();
+		interrupt->OneTick();
+		if (singleStep && (runUntilTime <= stats->totalTicks))
+			Debugger();
     }
 }
 
@@ -100,7 +107,8 @@ Machine::OneInstruction(Instruction *instr)
 
     // Fetch instruction 
     if (!machine->ReadMem(registers[PCReg], 4, &raw))
-	return;			// exception occurred
+		return;			// exception occurred
+		
     instr->value = raw;
     instr->Decode();
 
