@@ -18,8 +18,8 @@
 #define DIRECTORY_H
 
 #include "openfile.h"
-
-#define FileNameMaxLen 		9	// for simplicity, we assume 
+#define NumDirEntries 10
+#define FileNameMaxLen (((SectorSize - (sizeof(bool) + sizeof(int))*NumDirEntries) / sizeof(char)) - 1)	// for simplicity, we assume 
 					// file names are <= 9 characters long
 
 // The following class defines a "directory entry", representing a file
