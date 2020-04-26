@@ -22,7 +22,7 @@
 #include "stats.h"
 
 #define TransferSize 10 // make it small, just to be difficult
-
+extern FileSystem* fileSystem;
 //----------------------------------------------------------------------
 // Copy
 // 	Copy the contents of the UNIX file "from" to the Nachos file "to"

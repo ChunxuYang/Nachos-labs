@@ -48,7 +48,7 @@ bool FileHeader::Allocate(BitMap *freeMap, int fileSize)
     if (freeMap->NumClear() < numSectors)
         return FALSE; // not enough space
 
-    if (numSectors < NumDirect)
+    if (numSectors <= NumDirect)
     {
         DEBUG('f', "Allocating using direct indexing only\n");
         for (int i = 0; i < numSectors; i++)
@@ -56,16 +56,16 @@ bool FileHeader::Allocate(BitMap *freeMap, int fileSize)
     }
     else
     {
-        if (numSectors < (NumDirect + SectorCount))
+        if (numSectors <= (NumDirect + SectorCount))
         {
             DEBUG('f', "Allocating using single indirect indexing\n");
             // direct
-            for (int i = 0; i < NumDirect; i++)
+            for (int i = 0; i <= NumDirect; i++)
                 dataSectors[i] = freeMap->Find();
             // indirect
-            dataSectors[IndirectSectorIdx] = freeMap->Find();
+            //dataSectors[IndirectSectorIdx] = freeMap->Find();
             int indirectIndex[SectorCount];
-            for (int i = 0; i < numSectors - NumDirect; i++)
+            for (int i = 0; i < numSectors - IndirectSectorIdx; i++)
             {
                 indirectIndex[i] = freeMap->Find();
             }
@@ -88,52 +88,27 @@ bool FileHeader::Allocate(BitMap *freeMap, int fileSize)
 
 void FileHeader::Deallocate(BitMap *freeMap)
 {
-
-    int i, ii; // For direct / single indirect
-    DEBUG('f', "Deallocating direct indexing table\n");
-    for (i = 0; (i < numSectors) && (i < NumDirect); i++)
+    if (numSectors <= NumDirect)
     {
-        ASSERT(freeMap->Test((int)dataSectors[i])); // ought to be marked!
-        freeMap->Clear((int)dataSectors[i]);
-    }
-    if (numSectors > NumDirect)
-    {
-        DEBUG('f', "Deallocating single indirect indexing table\n");
-        int singleIndirectIndex[SectorCount]; // used to restore the indexing map
-        synchDisk->ReadSector(dataSectors[IndirectSectorIdx], (char *)singleIndirectIndex);
-        for (i = NumDirect, ii = 0; (i < numSectors) && (ii < SectorCount); i++, ii++)
+        for (int i = 0; i < numSectors; i++)
         {
-            ASSERT(freeMap->Test((int)singleIndirectIndex[ii])); // ought to be marked!
-            freeMap->Clear((int)singleIndirectIndex[ii]);
+            ASSERT(freeMap->Test((int)dataSectors[i]));
+            freeMap->Clear((int)dataSectors[i]);
         }
-        // Free the sector of the single indirect indexing table
-        ASSERT(freeMap->Test((int)dataSectors[IndirectSectorIdx]));
-        freeMap->Clear((int)dataSectors[IndirectSectorIdx]);
     }
-
-    // if (numSectors < NumDirect)
-    // {
-    //     for (int i = 0; i < numSectors; i++)
-    //     {
-    //         ASSERT(freeMap->Test((int)dataSectors[i])); // ought to be marked!
-    //         freeMap->Clear((int)dataSectors[i]);
-    //     }
-    // }
-    // else
-    // {
-    //     char *indirect_index = new char[SectorSize];
-    //     synchDisk->ReadSector(dataSectors[IndirectSectorIdx], indirect_index);
-    //     for (int i = 0; i < numSectors - IndirectSectorIdx; i++)
-    //     {
-    //         ASSERT(freeMap->Test((int)dataSectors[i * 4])); // ought to be marked!
-    //         freeMap->Clear((int)dataSectors[i * 4]);
-    //     }
-    //     for (int i = 0; i < NumDirect; i++)
-    //     {
-    //         ASSERT(freeMap->Test((int)dataSectors[i]));
-    //         freeMap->Clear((int)dataSectors[i]);
-    //     }
-    // }
+    else
+    {
+        int indirect_idx[SectorSize];
+        synchDisk->ReadSector(dataSectors[IndirectSectorIdx], (char *)indirect_idx);
+        for (int i = 0; i < numSectors - IndirectSectorIdx; i++)
+        {
+            freeMap->Clear(indirect_idx[i]);
+        }
+        for (int i = 0; i <= NumDirect; i++)
+        {
+            freeMap->Clear(dataSectors[i]);
+        }
+    }
 }
 
 //----------------------------------------------------------------------
@@ -174,39 +149,17 @@ int FileHeader::ByteToSector(int offset)
 {
 
     const int directMapSize = NumDirect * SectorSize;
-    const int singleIndirectMapSize = directMapSize + SectorCount * SectorSize;
-    //const int doubleIndirectMapSize = singleIndirectMapSize +  SectorCount * SectorCount * SectorSize;
-    //printf("offset: %d, directMapSize: %d, singleIndirectMapSize: %d\n",offset, directMapSize, singleIndirectMapSize);
     if (offset < directMapSize)
     {
-        //printf("offset: %d, xxx %d\n", offset, dataSectors[offset / SectorSize]);
         return (dataSectors[offset / SectorSize]);
-    }
-    else if (offset < singleIndirectMapSize)
-    {
-        const int sectorNum = (offset - directMapSize) / SectorSize;
-        int singleIndirectIndex[SectorCount]; // used to restore the indexing map
-
-        synchDisk->ReadSector(dataSectors[IndirectSectorIdx], (char *)singleIndirectIndex);
-        printf("offset: %d, xxx %d\n", offset, singleIndirectIndex[sectorNum]);
-        return singleIndirectIndex[sectorNum];
     }
     else
     {
-        ASSERT(FALSE);
+        const int sectorNum = (offset - directMapSize) / SectorSize;
+        int singleIndirectIndex[SectorCount];
+        synchDisk->ReadSector(dataSectors[IndirectSectorIdx], (char *)singleIndirectIndex);
+        return singleIndirectIndex[sectorNum];
     }
-    // const int directMapSize = NumDirect * SectorSize;
-    // if (offset < directMapSize)
-    // {
-    //     return dataSectors[offset / SectorSize];
-    // }
-    // else
-    // {
-    //     const int sectorNum = (offset - directMapSize) / SectorSize;
-    //     char *singleIndirectIndex = new char[SectorSize]; // used to restore the indexing map
-    //     synchDisk->ReadSector(dataSectors[IndirectSectorIdx], singleIndirectIndex);
-    //     return int(singleIndirectIndex[sectorNum * 4]);
-    // }
 }
 
 //----------------------------------------------------------------------
@@ -244,115 +197,70 @@ void FileHeader::Print()
     printf(" Modified:\t%s\n", modifiedTime);
 
     printf(" File size:\t%d\n File blocks:\n\t", numBytes);
-
-    int ii;                               // For single / double indirect indexing
-    int singleIndirectIndex[SectorCount]; // used to restore the indexing map
-    int doubleIndirectIndex[SectorCount]; // used to restore the indexing map
-    printf("  Direct indexing:\n    ");
-    for (i = 0; (i < numSectors) && (i < NumDirect); i++)
-        printf("%d ", dataSectors[i]);
-    if (numSectors > NumDirect)
+    if (numSectors <= NumDirect)
     {
-        printf("\n  Indirect indexing: (mapping table sector: %d)\n    ", dataSectors[IndirectSectorIdx]);
-        synchDisk->ReadSector(dataSectors[IndirectSectorIdx], (char *)singleIndirectIndex);
-        for (i = NumDirect, ii = 0; (i < numSectors) && (ii < SectorCount); i++, ii++)
-            printf("%d ", singleIndirectIndex[ii]);
-    }
-    printf("\nFile contents:\n");
-    for (i = k = 0; (i < numSectors) && (i < NumDirect); i++)
-    {
-        synchDisk->ReadSector(dataSectors[i], data);
-        for (j = 0; (j < SectorSize) && (k < numBytes); j++, k++)
-            printChar(data[j]);
-        printf("\n");
-    }
-    if (numSectors > NumDirect)
-    {
-        synchDisk->ReadSector(dataSectors[IndirectSectorIdx], (char *)singleIndirectIndex);
-        for (i = NumDirect, ii = 0; (i < numSectors) && (ii < SectorCount); i++, ii++)
+        for (i = 0; i < numSectors; i++)
         {
-            synchDisk->ReadSector(singleIndirectIndex[ii], data);
-            for (j = 0; (j < SectorSize) && (k < numBytes); j++, k++)
+            printf("%d ", dataSectors[i]);
+        }
+    }
+    else
+    {
+        for(i = 0; i < IndirectSectorIdx; i++)
+        {
+            printf("%d ", dataSectors[i]);
+        }
+                printf("\nUsing indirect index: %d\n", dataSectors[IndirectSectorIdx]);
+
+        int indirect_index[SectorCount];
+        synchDisk->ReadSector(dataSectors[IndirectSectorIdx], (char *)indirect_index);
+        for (i = 0; i < numSectors - IndirectSectorIdx; i++)
+        {
+            printf("%d ", indirect_index[i]);
+        }
+        
+    }
+    printf("\n");
+    printf("File contents: \n");
+    if(numSectors <= NumDirect)
+    {
+        for(i = k = 0; i < numSectors; i++)
+        {
+            synchDisk->ReadSector(dataSectors[i], data);
+            for ( j = 0; (j < SectorSize) && (k < numBytes); j++, k++)
+            {
                 printChar(data[j]);
+            }
             printf("\n");
         }
     }
+    else
+    {
+        for(i = k = 0; i < IndirectSectorIdx; i++)
+        {
+            synchDisk->ReadSector(dataSectors[i], data);
+            for ( j = 0; (j < SectorSize) && (k < numBytes); j++, k++)
+            {
+                printChar(data[j]);
+            }
+            printf("\n");
+        }
+        int indirect_index[SectorCount];
+        synchDisk->ReadSector(dataSectors[IndirectSectorIdx], (char *)indirect_index);
+        for(i = 0; i < numSectors - IndirectSectorIdx; i++)
+        {
+            printf("In sector %d\n", indirect_index[i]);
+            synchDisk->ReadSector(indirect_index[i], data);
+            for(j = 0; (j < SectorSize) && (k < numBytes); j++, k++)
+            {
+                printChar(data[j]);
+            }
+            printf("\n");
+        }
+    }
+    printf("\n");
     printf("----------------------------------------------\n");
     delete[] data;
-    // for (i = 0; i < numSectors; i++)
-    //     printf("\t%d ", dataSectors[i]);
-    // if (numSectors < NumDirect)
-    // {
-    //     for (i = 0; i < numSectors; i++)
-    //     {
-    //         printf("%d ", dataSectors[i]);
-    //     }
-    // }
-    // else
-    // {
-    //     printf("Using indirect index : %d\n", dataSectors[IndirectSectorIdx]);
-    //     for (i = 0; i < NumDirect - 1; i++)
-    //     {
-    //         printf("%d ", dataSectors[i]);
-    //     }
-    //     char *indirect_index = new char[SectorSize];
-    //     synchDisk->ReadSector(dataSectors[IndirectSectorIdx], indirect_index);
-    //     j = 0;
-    //     for (i = 0; i < numSectors - IndirectSectorIdx; i++)
-    //     {
-    //         printf("%d ", int(indirect_index[j]));
-    //         j = j + 4;
-    //     }
-    //     printf("\n");
-    // }
-    // printf("\nFile contents:\n");
-    // if (numSectors < NumDirect)
-    // {
-    //     for (i = k = 0; i < numSectors; i++)
-    //     {
-    //         synchDisk->ReadSector(dataSectors[i], data);
-    //         for (j = 0; (j < SectorSize) && (k < numBytes); j++, k++)
-    //         {
-    //             if ('\040' <= data[j] && data[j] <= '\176') // isprint(data[j])
-    //                 printf("%c", data[j]);
-    //             else
-    //                 printf("\\%x", (unsigned char)data[j]);
-    //         }
-    //         printf("\n");
-    //     }
-    // }
-    // else
-    // {
-    //     for (i = k = 0; i < numSectors; i++)
-    //     {
-    //         printf("Sector %d:\n", dataSectors[i]);
-    //         synchDisk->ReadSector(dataSectors[i], data);
-    //         for (j = 0; (j < SectorSize) && (k < numBytes); j++, k++)
-    //         {
-    //             if ('\040' <= data[j] && data[j] <= '\176') // isprint(data[j])
-    //                 printf("%c", data[j]);
-    //             else
-    //                 printf("\\%x", (unsigned char)data[j]);
-    //         }
-    //         printf("\n");
-    //     }
-    //     char *indirect_index = new char[SectorSize];
-    //     synchDisk->ReadSector(dataSectors[IndirectSectorIdx], indirect_index);
-    //     for (i = 0; i < numSectors - IndirectSectorIdx; i++)
-    //     {
-    //         printf("Sector %d:\n", int(indirect_index[i * 4]));
-    //         synchDisk->ReadSector(int(indirect_index[i * 4]), data);
-    //         for (j = 0; (j < SectorSize) && (k < numBytes); j++, k++)
-    //         {
-    //             if ('\040' <= data[j] && data[j] <= '\176') // isprint(data[j])
-    //                 printf("%c", data[j]);
-    //             else
-    //                 printf("\\%x", (unsigned char)data[j]);
-    //         }
-    //         printf("\n");
-    //     }
-    // }
-    // delete[] data;
 }
 
 char *getFileType(char *filename)

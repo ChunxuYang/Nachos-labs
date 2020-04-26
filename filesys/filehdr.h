@@ -25,11 +25,10 @@
 #define FILE_ALL_LENGTH FILE_TYPE_LENGTH + FILE_TIME_LENGTH *NumOfTimeHeaderInfo
 
 #define NumDataSectors ((SectorSize - (NumOfIntHeaderInfo * sizeof(int) + FILE_ALL_LENGTH * sizeof(char))) / sizeof(int))
-#define NumDirect (NumDataSectors - 1)
-// #define NumDirect 30
+#define NumDirect (NumDataSectors-1)
 #define MaxFileSize ((NumDirect * SectorSize) + ((SectorSize / sizeof(int))*SectorSize))
 
-#define IndirectSectorIdx (NumDirect - 1)
+#define IndirectSectorIdx (NumDirect)
 
 // The following class defines the Nachos "file header" (in UNIX terms,
 // the "i-node"), describing where on disk to find all of the data in the file.
@@ -98,7 +97,7 @@ private:
   char modifiedTime[FILE_TIME_LENGTH];
   char lastVisitedTime[FILE_TIME_LENGTH];
 
-  int dataSectors[NumDirect]; // Disk sector numbers for each data
+  int dataSectors[NumDataSectors]; // Disk sector numbers for each data
                               // block in the file
   int headerSector;
 };
