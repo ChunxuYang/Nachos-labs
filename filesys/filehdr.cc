@@ -287,3 +287,33 @@ void FileHeader::setHeader(char *ext)
     setModifyTime(currentTime);
     setVisitTime(currentTime);
 }
+
+bool FileHeader::ExpandSize(BitMap *freemap, int additionalBytes)
+{
+    ASSERT(additionalBytes > 0);
+    numBytes += additionalBytes;
+    int initSector = numSectors;
+    numSectors = divRoundUp(numBytes, SectorSize);
+    if(initSector == numSectors)
+    {
+        return TRUE;
+    }
+    int sectorsAdded = numSectors - initSector;
+    if(freemap->NumClear() < sectorsAdded)
+    {
+        return FALSE;
+    }
+    DEBUG('f', "Expanding file size for %d sectors (%d bytes)\n", sectorsAdded, additionalBytes);
+    if(numSectors < NumDirect)
+    {
+        for(int i = initSector; i < numSectors; i++)
+        {
+            dataSectors[i] = freemap->Find();
+        }
+    }
+    else
+    {
+        ASSERT(FALSE);
+    }
+    return TRUE;
+}

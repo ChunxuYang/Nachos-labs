@@ -195,3 +195,9 @@ void PerformanceTest()
     }
     stats->Print();
 }
+
+void MakeDir(char *dirname)
+{
+    printf("Making Dir %s.\n", dirname);
+    fileSystem->Create(dirname, -1);
+}

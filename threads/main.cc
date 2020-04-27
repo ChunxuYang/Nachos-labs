@@ -60,7 +60,7 @@ extern int testnum;
 // External functions used by this file
 
 extern void ThreadTest(void), Copy(char *unixFile, char *nachosFile);
-extern void Print(char *file), PerformanceTest(void);
+extern void Print(char *file), PerformanceTest(void), MakeDir(char *dirname);
 extern void StartProcess(char *file), ConsoleTest(char *in, char *out);
 extern void MailTest(int networkID);
 
@@ -166,6 +166,26 @@ int main(int argc, char **argv)
 		{ // performance test
 			PerformanceTest();
 		}
+		else if (!strcmp(*argv, "-mkdir"))
+		{
+			ASSERT(argc > 1);
+			MakeDir(*(argv + 1));
+			argCount = 2;
+		}
+		else if (!strcmp(*argv, "-rmdir"))
+		{
+			ASSERT(argc > 1);
+			bool success = fileSystem->RemoveDir(*(argv + 1));
+			ASSERT(success);
+			argCount = 2;
+		}
+		else if (!strcmp(*argv, "-ls"))
+		{
+			ASSERT(argc > 1);
+			fileSystem->ListDir(*(argv + 1));
+			argCount = 2;
+		}
+
 #else
 #endif // FILESYS
 #ifdef NETWORK
@@ -181,12 +201,12 @@ int main(int argc, char **argv)
 #endif // NETWORK
 	}
 	currentThread->Finish(); // NOTE: if the procedure "main"
-		// returns, then the program "nachos"
-		// will exit (as any other normal program
-		// would).  But there may be other
-		// threads on the ready list.  We switch
-		// to those threads by saying that the
-		// "main" thread is finished, preventing
-		// it from returning.
-	return (0); // Not reached...
+							 // returns, then the program "nachos"
+							 // will exit (as any other normal program
+							 // would).  But there may be other
+							 // threads on the ready list.  We switch
+							 // to those threads by saying that the
+							 // "main" thread is finished, preventing
+							 // it from returning.
+	return (0);				 // Not reached...
 }

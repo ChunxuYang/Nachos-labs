@@ -62,6 +62,7 @@
 // of files that can be loaded onto the disk.
 #define FreeMapFileSize (NumSectors / BitsInByte)
 #define DirectoryFileSize (sizeof(DirectoryEntry) * NumDirEntries)
+#define IsDirFile(fileHdr) (!strcmp(fileHdr->getFileType(), DirFileExt))
 
 //----------------------------------------------------------------------
 // FileSystem::FileSystem
@@ -184,11 +185,29 @@ bool FileSystem::Create(char *name, int initialSize)
     FileHeader *hdr;
     int sector;
     bool success;
-
-    DEBUG('f', "Creating file %s, size %d\n", name, initialSize);
+    bool isDir = FALSE;
+    if (initialSize == -1)
+    {
+        isDir = TRUE;
+        initialSize = DirectoryFileSize;
+        printf("Creating Dir %s, size %d\n", name, initialSize);
+    }
+    else
+    {
+        DEBUG('f', "Creating file %s, size %d\n", name, initialSize);
+    }
 
     directory = new Directory(NumDirEntries);
-    directory->FetchFrom(directoryFile);
+    //directory->FetchFrom(directoryFile);
+    int dirSector = FindDirSector(name);
+    ASSERT(dirSector != -1);
+    OpenFile *dirFile = new OpenFile(dirSector);
+    directory->FetchFrom(dirFile);
+    FilePath filepath = pathParser(name);
+    if (filepath.depth > 0)
+    {
+        name = filepath.base;
+    }
 
     if (directory->Find(name) != -1)
         success = FALSE; // file is already in directory
@@ -210,9 +229,26 @@ bool FileSystem::Create(char *name, int initialSize)
             {
                 success = TRUE;
                 // everthing worked, flush all changes back to disk
-                hdr->setHeader(getFileType(name));
+                if (isDir)
+                {
+                    hdr->setHeader(DirFileExt);
+                }
+                else
+                {
+                    hdr->setHeader(getFileType(name));
+                }
                 hdr->WriteBack(sector);
-                directory->WriteBack(directoryFile);
+                // directory->WriteBack(directoryFile);
+                if(isDir)
+                {
+                    Directory* dir = new Directory(NumDirEntries);
+                    OpenFile* subDirFile = new OpenFile(sector);
+                    dir->WriteBack(subDirFile);
+                    delete dir;
+                    delete subDirFile;
+                }
+                directory->WriteBack(dirFile);
+                delete dirFile;
                 freeMap->WriteBack(freeMapFile);
             }
             delete hdr;
@@ -236,12 +272,21 @@ bool FileSystem::Create(char *name, int initialSize)
 OpenFile *
 FileSystem::Open(char *name)
 {
-    Directory *directory = new Directory(NumDirEntries);
+    //Directory *directory = new Directory(NumDirEntries);
+    Directory *directory;
     OpenFile *openFile = NULL;
     int sector;
 
     DEBUG('f', "Opening file %s\n", name);
-    directory->FetchFrom(directoryFile);
+
+    directory = (Directory*)FindDir(name);
+    FilePath filepath = pathParser(name);
+    if(filepath.depth > 0)
+    {
+        name = filepath.base;
+    }
+
+    //directory->FetchFrom(directoryFile);
     sector = directory->Find(name);
     if (sector >= 0)
         openFile = new OpenFile(sector); // name was found in directory
@@ -270,16 +315,31 @@ bool FileSystem::Remove(char *name)
     FileHeader *fileHdr;
     int sector;
 
-    directory = new Directory(NumDirEntries);
-    directory->FetchFrom(directoryFile);
+    // directory = new Directory(NumDirEntries);
+    // directory->FetchFrom(directoryFile);
+    directory = (Directory*)FindDir(name);
+    FilePath filepath = pathParser(name);
+    if(filepath.depth > 0)
+    {
+        name = filepath.base;
+    }
     sector = directory->Find(name);
     if (sector == -1)
     {
         delete directory;
+        printf("[REMOVE] File %s Not Found\n", name);
         return FALSE; // file not found
     }
     fileHdr = new FileHeader;
     fileHdr->FetchFrom(sector);
+
+    if(IsDirFile(fileHdr))
+    {
+        printf("[FAILED] Reject the remove operation (attempt to delete a directory).\n");
+        delete directory;
+        delete fileHdr;
+        return FALSE;
+    }
 
     freeMap = new BitMap(NumSectors);
     freeMap->FetchFrom(freeMapFile);
@@ -345,4 +405,100 @@ void FileSystem::Print()
     delete dirHdr;
     delete freeMap;
     delete directory;
+}
+
+int FileSystem::FindDirSector(char *filePath)
+{
+    FilePath filepath = pathParser(filePath);
+    int sector = DirectorySector;
+    if (filepath.depth != 0)
+    {
+        OpenFile *dirFile;
+        Directory *dirTemp;
+
+        for (int i = 0; i < filepath.depth; i++)
+        {
+            dirFile = new OpenFile(sector);
+            dirTemp = new Directory(NumDirEntries);
+            dirTemp->FetchFrom(dirFile);
+            sector = dirTemp->Find(filepath.pathArray[i]);
+            if (sector == -1)
+            {
+                break;
+            }
+        }
+        delete dirFile;
+        delete dirTemp;
+    }
+    return sector;
+}
+
+void *FileSystem::FindDir(char *path)
+{
+    Directory *returnDir = new Directory(NumDirEntries);
+    int sector = FindDirSector(path);
+    if (sector == DirectorySector)
+    {
+        returnDir->FetchFrom(directoryFile);
+    }
+    else if (sector != -1)
+    {
+        OpenFile *dirFile = new OpenFile(sector);
+        returnDir->FetchFrom(dirFile);
+        delete dirFile;
+    }
+    else
+    {
+        printf("No such directory.\n", path);
+    }
+
+    return (void *)returnDir;
+}
+
+void FileSystem::ListDir(char* name)
+{
+    printf("List Directory: %s\n", name);
+    Directory *directory = (Directory*)FindDir(strcat(name, "/arbitrary"));
+    directory->List();
+    delete directory;
+}
+
+bool
+FileSystem::RemoveDir(char *name)
+{ 
+    Directory *directory;
+    BitMap *freeMap;
+    FileHeader *fileHdr;
+    int sector;
+
+    directory = (Directory*)FindDir(name);
+    directory->removeAll();
+
+    FilePath filepath = pathParser(name);
+    if (filepath.depth > 0) {
+        name = filepath.base;
+    }
+    sector = directory->Find(name);
+    if (sector == -1) {
+       delete directory;
+       printf("File %s Not Found\n", name);
+       return FALSE;			 // file not found 
+    }
+
+    fileHdr = new FileHeader;
+    fileHdr->FetchFrom(sector);
+
+    freeMap = new BitMap(NumSectors);
+    freeMap->FetchFrom(freeMapFile);
+
+    fileHdr->Deallocate(freeMap);  		// remove data blocks
+    freeMap->Clear(sector);			// remove header block
+    directory->Remove(name);
+
+    freeMap->WriteBack(freeMapFile);		// flush to disk
+    directory->WriteBack(directoryFile);        // flush to disk
+    delete fileHdr;
+    delete directory;
+    delete freeMap;
+    return TRUE;
 }

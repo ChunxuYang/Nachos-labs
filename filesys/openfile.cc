@@ -19,6 +19,7 @@
 #include <strings.h>
 #endif
 
+#define FreeMapSector 0
 //----------------------------------------------------------------------
 // OpenFile::OpenFile
 // 	Open a Nachos file for reading and writing.  Bring the file header
@@ -154,7 +155,17 @@ OpenFile::WriteAt(char *from, int numBytes, int position)
     int i, firstSector, lastSector, numSectors;
     bool firstAligned, lastAligned;
     char *buf;
-
+    if(position + numBytes > fileLength)
+    {
+        BitMap *freeMap = new BitMap(NumSectors);
+        OpenFile* freeMapFile = new OpenFile(FreeMapSector);
+        freeMap->FetchFrom(freeMapFile);
+        hdr->ExpandSize(freeMap, position + numBytes - fileLength);
+        hdr->WriteBack(hdr->getHeaderSector());
+        freeMap->WriteBack(freeMapFile);
+        delete freeMapFile;
+        fileLength = hdr->FileLength();
+    }
     if ((numBytes <= 0) || (position >= fileLength))
 	return 0;				// check request
     if ((position + numBytes) > fileLength)
