@@ -20,6 +20,7 @@
 #include "thread.h"
 #include "disk.h"
 #include "stats.h"
+#include "console.h"
 
 #define TransferSize 10 // make it small, just to be difficult
 extern FileSystem* fileSystem;
@@ -200,4 +201,23 @@ void MakeDir(char *dirname)
 {
     printf("Making Dir %s.\n", dirname);
     fileSystem->Create(dirname, -1);
+}
+
+static SynchConsole* synchConsole;
+
+void SynchConsoleTest(char* in, char* out)
+{
+    char ch;
+    synchConsole = new SynchConsole(in, out);
+    while (TRUE)
+    {
+        ch = synchConsole->GetChar();
+        synchConsole->PutChar(ch);
+        if(ch == 'q')
+        {
+            printf("\n");
+            return;
+        }
+    }
+    
 }

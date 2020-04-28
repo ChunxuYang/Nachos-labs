@@ -148,3 +148,37 @@ Console::PutChar(char ch)
     interrupt->Schedule(ConsoleWriteDone, (int)this, ConsoleTime,
 					ConsoleWriteInt);
 }
+
+
+SynchConsole::SynchConsole(char *readFile, char *writeFile)
+{
+	lock = new Lock("Console Lock");
+	semaphoreRead = new Semaphore("Console Read sem", 0);
+	semaphoreWrite = new Semaphore("Console Write sem", 0);
+	console = new Console(readFile, writeFile, SynchConsoleRead, SynchConsoleWrite, (int)this);
+}
+
+SynchConsole::~SynchConsole()
+{
+	delete console;
+	delete lock;
+	delete semaphoreRead;
+	delete semaphoreWrite;
+}
+
+void SynchConsole::PutChar(char ch)
+{
+	lock->Acquire();
+	console->PutChar(ch);
+	semaphoreWrite->P();
+	lock->Release();
+}
+
+char SynchConsole::GetChar()
+{
+	lock->Acquire();
+	semaphoreRead->P();
+	char ch = console->GetChar();
+	lock->Release();
+	return ch;
+}

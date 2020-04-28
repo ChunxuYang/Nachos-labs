@@ -61,7 +61,7 @@ extern int testnum;
 
 extern void ThreadTest(void), Copy(char *unixFile, char *nachosFile);
 extern void Print(char *file), PerformanceTest(void), MakeDir(char *dirname);
-extern void StartProcess(char *file), ConsoleTest(char *in, char *out);
+extern void StartProcess(char *file), ConsoleTest(char *in, char *out), SynchConsoleTest(char* in, char* out);
 extern void MailTest(int networkID);
 
 //----------------------------------------------------------------------
@@ -133,6 +133,21 @@ int main(int argc, char **argv)
 							   // Nachos will loop forever waiting
 							   // for console input
 		}
+		else if (!strcmp(*argv, "-synch"))
+		{
+			if(argc == 1)
+			{
+				SynchConsoleTest(NULL, NULL);
+			}
+			else
+			{
+				ASSERT(argc > 2);
+				SynchConsoleTest(*(argv + 1), *(argv + 2));
+				argCount = 3;
+			}
+			interrupt->Halt();
+		}
+		
 
 #endif // USER_PROGRAM
 #ifdef FILESYS
