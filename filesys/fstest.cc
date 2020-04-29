@@ -23,7 +23,7 @@
 #include "console.h"
 
 #define TransferSize 10 // make it small, just to be difficult
-extern FileSystem* fileSystem;
+extern FileSystem *fileSystem;
 //----------------------------------------------------------------------
 // Copy
 // 	Copy the contents of the UNIX file "from" to the Nachos file "to"
@@ -31,7 +31,7 @@ extern FileSystem* fileSystem;
 
 void Copy(char *from, char *to)
 {
-                  
+
     FILE *fp;
     OpenFile *openFile;
     int amountRead, fileLength;
@@ -43,7 +43,7 @@ void Copy(char *from, char *to)
         printf("Copy: couldn't open input file %s\n", from);
         return;
     }
-    
+
     // Figure out length of UNIX file
     fseek(fp, 0, 2);
     fileLength = ftell(fp);
@@ -63,15 +63,16 @@ void Copy(char *from, char *to)
 
     // Copy the data in TransferSize chunks
     buffer = new char[TransferSize];
-    while ((amountRead = fread(buffer, sizeof(char), TransferSize, fp)) > 0){
-    
+    while ((amountRead = fread(buffer, sizeof(char), TransferSize, fp)) > 0)
+    {
+
         openFile->Write(buffer, amountRead);
     }
     delete[] buffer;
 
     // Close the UNIX and the Nachos files
     delete openFile;
-    
+
     fclose(fp);
 }
 
@@ -85,7 +86,6 @@ void Print(char *name)
     OpenFile *openFile;
     int i, amountRead;
     char *buffer;
-    printf("GETHERE\n");
 
     if ((openFile = fileSystem->Open(name)) == NULL)
     {
@@ -118,7 +118,7 @@ void Print(char *name)
 #define FileName "TestFile"
 #define Contents "1234567890"
 #define ContentSize strlen(Contents)
-#define FileSize ((int)(ContentSize * 5000))
+#define FileSize ((int)(ContentSize))
 
 static void
 FileWrite()
@@ -155,6 +155,7 @@ FileWrite()
 static void
 FileRead()
 {
+
     OpenFile *openFile;
     char *buffer = new char[ContentSize];
     int i, numBytes;
@@ -183,17 +184,71 @@ FileRead()
     delete openFile; // close file
 }
 
+void MyReaderThread(int loopnum)
+{
+    OpenFile *openFile = fileSystem->Open(FileName);
+    if (openFile == NULL)
+    {
+        printf("%s: Can't open file %s.\n", currentThread->getName(), FileName);
+    }
+    char *buffer = new char[ContentSize];
+    for (int i = 1; i <= loopnum; i++)
+    {
+
+        openFile->Read(buffer, 4);
+        printf("==> Thread %s Read %s.\n", currentThread->getName(), buffer);
+        currentThread->Yield();
+    }
+    delete buffer;
+    delete openFile;
+}
+
+void MyWriterThread(int loopnum)
+{
+    OpenFile *openFile = fileSystem->Open(FileName);
+    if (openFile == NULL)
+    {
+        printf("%s: Can't open file %s.\n", currentThread->getName(), FileName);
+    }
+    char *buffer = new char[ContentSize];
+    for (int i = 1; i <= loopnum; i++)
+    {
+        //printf("==> Thread %s begin writing.\n", currentThread->getName());
+        openFile->Write(Contents, ContentSize);
+        printf("==> Thread %s Write %s.\n", currentThread->getName(), Contents);
+        currentThread->Yield();
+    }
+    fileSystem->Remove(FileName);
+    delete buffer;
+    delete openFile;
+}
+
 void PerformanceTest()
 {
     printf("Starting file system performance test:\n");
-    stats->Print();
-    FileWrite();
-    FileRead();
-    if (!fileSystem->Remove(FileName))
+    Thread *reader = Thread::createThread("reader");
+    //Thread *writer = Thread::createThread("writer");
+    if (!fileSystem->Create(FileName, 3000))
     {
-        printf("Perf test: unable to remove %s\n", FileName);
-        return;
+        printf("Create fail!\n");
     }
+    OpenFile *openFile = fileSystem->Open(FileName);
+    if (openFile == NULL)
+    {
+        printf("Open fail!\n");
+    }
+    else
+    {
+        printf("Creating file success.\n");
+    }
+    printf("Write %d\n", openFile->Write(Contents, ContentSize));
+    //writer->Fork(MyWriterThread, 10);
+    reader->Fork(MyReaderThread, 10);
+    
+    MyWriterThread(5);
+
+    currentThread->Yield();
+
     stats->Print();
 }
 
@@ -203,9 +258,9 @@ void MakeDir(char *dirname)
     fileSystem->Create(dirname, -1);
 }
 
-static SynchConsole* synchConsole;
+static SynchConsole *synchConsole;
 
-void SynchConsoleTest(char* in, char* out)
+void SynchConsoleTest(char *in, char *out)
 {
     char ch;
     synchConsole = new SynchConsole(in, out);
@@ -213,11 +268,10 @@ void SynchConsoleTest(char* in, char* out)
     {
         ch = synchConsole->GetChar();
         synchConsole->PutChar(ch);
-        if(ch == 'q')
+        if (ch == 'q')
         {
             printf("\n");
             return;
         }
     }
-    
 }

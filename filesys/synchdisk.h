@@ -42,6 +42,14 @@ public:
     void RequestDone(); // Called by the disk device interrupt
                         // handler, to signal that the
                         // current disk operation is complete.
+    void AddReader(int sector);
+    void DeleteReader(int sector);
+    void BeginWrite(int sector) { mutex[sector]->P(); }
+    void EndWrite(int sector) { mutex[sector]->V(); }
+
+    void AddVisitor(int sector){numVisitors[sector]++;}
+    void DeleteVisitor(int sector){numVisitors[sector]--;}
+    bool CanRemove(int sector){return numVisitors[sector] == 0;}
 
 private:
     Disk *disk;           // Raw disk device
@@ -49,6 +57,10 @@ private:
                           // with the interrupt handler
     Lock *lock;           // Only one read/write request
                           // can be sent to the disk at a time
+    Semaphore *mutex[NumSectors];
+    int numReaders[NumSectors];
+    int numVisitors[NumSectors];
+    Lock *readerLock;
 };
 
 #endif // SYNCHDISK_H

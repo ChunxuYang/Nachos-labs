@@ -50,6 +50,7 @@
 #include "directory.h"
 #include "filehdr.h"
 #include "filesys.h"
+#include "synchdisk.h"
 
 // Sectors containing the file headers for the bitmap of free sectors,
 // and the directory of files.  These file headers are placed in well-known
@@ -76,6 +77,8 @@
 //
 //	"format" -- should we initialize the disk?
 //----------------------------------------------------------------------
+
+extern SynchDisk *synchDisk;
 
 FileSystem::FileSystem(bool format)
 {
@@ -239,10 +242,10 @@ bool FileSystem::Create(char *name, int initialSize)
                 }
                 hdr->WriteBack(sector);
                 // directory->WriteBack(directoryFile);
-                if(isDir)
+                if (isDir)
                 {
-                    Directory* dir = new Directory(NumDirEntries);
-                    OpenFile* subDirFile = new OpenFile(sector);
+                    Directory *dir = new Directory(NumDirEntries);
+                    OpenFile *subDirFile = new OpenFile(sector);
                     dir->WriteBack(subDirFile);
                     delete dir;
                     delete subDirFile;
@@ -279,9 +282,9 @@ FileSystem::Open(char *name)
 
     DEBUG('f', "Opening file %s\n", name);
 
-    directory = (Directory*)FindDir(name);
+    directory = (Directory *)FindDir(name);
     FilePath filepath = pathParser(name);
-    if(filepath.depth > 0)
+    if (filepath.depth > 0)
     {
         name = filepath.base;
     }
@@ -317,23 +320,29 @@ bool FileSystem::Remove(char *name)
 
     // directory = new Directory(NumDirEntries);
     // directory->FetchFrom(directoryFile);
-    directory = (Directory*)FindDir(name);
+    directory = (Directory *)FindDir(name);
     FilePath filepath = pathParser(name);
-    if(filepath.depth > 0)
+    if (filepath.depth > 0)
     {
         name = filepath.base;
     }
     sector = directory->Find(name);
+    printf("  %d\n", sector);
     if (sector == -1)
     {
         delete directory;
         printf("[REMOVE] File %s Not Found\n", name);
         return FALSE; // file not found
     }
+
     fileHdr = new FileHeader;
     fileHdr->FetchFrom(sector);
+    if(!synchDisk->CanRemove(sector))
+    {
+        printf("Cannot Remove file %s with other thread visiting.\n", name);
+    }
 
-    if(IsDirFile(fileHdr))
+    if (IsDirFile(fileHdr))
     {
         printf("[FAILED] Reject the remove operation (attempt to delete a directory).\n");
         delete directory;
@@ -350,9 +359,10 @@ bool FileSystem::Remove(char *name)
 
     freeMap->WriteBack(freeMapFile);     // flush to disk
     directory->WriteBack(directoryFile); // flush to disk
+    delete freeMap;
     delete fileHdr;
     delete directory;
-    delete freeMap;
+
     return TRUE;
 }
 
@@ -455,34 +465,35 @@ void *FileSystem::FindDir(char *path)
     return (void *)returnDir;
 }
 
-void FileSystem::ListDir(char* name)
+void FileSystem::ListDir(char *name)
 {
     printf("List Directory: %s\n", name);
-    Directory *directory = (Directory*)FindDir(strcat(name, "/arbitrary"));
+    Directory *directory = (Directory *)FindDir(strcat(name, "/arbitrary"));
     directory->List();
     delete directory;
 }
 
-bool
-FileSystem::RemoveDir(char *name)
-{ 
+bool FileSystem::RemoveDir(char *name)
+{
     Directory *directory;
     BitMap *freeMap;
     FileHeader *fileHdr;
     int sector;
 
-    directory = (Directory*)FindDir(name);
+    directory = (Directory *)FindDir(name);
     directory->removeAll();
 
     FilePath filepath = pathParser(name);
-    if (filepath.depth > 0) {
+    if (filepath.depth > 0)
+    {
         name = filepath.base;
     }
     sector = directory->Find(name);
-    if (sector == -1) {
-       delete directory;
-       printf("File %s Not Found\n", name);
-       return FALSE;			 // file not found 
+    if (sector == -1)
+    {
+        delete directory;
+        printf("File %s Not Found\n", name);
+        return FALSE; // file not found
     }
 
     fileHdr = new FileHeader;
@@ -491,12 +502,12 @@ FileSystem::RemoveDir(char *name)
     freeMap = new BitMap(NumSectors);
     freeMap->FetchFrom(freeMapFile);
 
-    fileHdr->Deallocate(freeMap);  		// remove data blocks
-    freeMap->Clear(sector);			// remove header block
+    fileHdr->Deallocate(freeMap); // remove data blocks
+    freeMap->Clear(sector);       // remove header block
     directory->Remove(name);
 
-    freeMap->WriteBack(freeMapFile);		// flush to disk
-    directory->WriteBack(directoryFile);        // flush to disk
+    freeMap->WriteBack(freeMapFile);     // flush to disk
+    directory->WriteBack(directoryFile); // flush to disk
     delete fileHdr;
     delete directory;
     delete freeMap;
