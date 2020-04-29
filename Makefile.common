@@ -98,16 +98,18 @@ FILESYS_H =../filesys/directory.h \
 	../filesys/filesys.h \
 	../filesys/openfile.h\
 	../filesys/synchdisk.h\
-	../machine/disk.h
+	../machine/disk.h\
+	../filesys/pipe.h
 FILESYS_C =../filesys/directory.cc\
 	../filesys/filehdr.cc\
 	../filesys/filesys.cc\
 	../filesys/fstest.cc\
 	../filesys/openfile.cc\
 	../filesys/synchdisk.cc\
-	../machine/disk.cc
+	../machine/disk.cc\
+	../filesys/pipe.cc
 FILESYS_O =directory.o filehdr.o filesys.o fstest.o openfile.o synchdisk.o\
-	disk.o
+	disk.o pipe.o
 
 NETWORK_H = ../network/post.h ../machine/network.h
 NETWORK_C = ../network/nettest.cc ../network/post.cc ../machine/network.cc

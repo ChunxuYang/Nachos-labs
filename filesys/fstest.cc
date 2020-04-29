@@ -21,9 +21,11 @@
 #include "disk.h"
 #include "stats.h"
 #include "console.h"
+#include "pipe.h"
 
 #define TransferSize 10 // make it small, just to be difficult
 extern FileSystem *fileSystem;
+//extern Pipe *pipe;// = new Pipe();
 //----------------------------------------------------------------------
 // Copy
 // 	Copy the contents of the UNIX file "from" to the Nachos file "to"
@@ -31,7 +33,6 @@ extern FileSystem *fileSystem;
 
 void Copy(char *from, char *to)
 {
-
     FILE *fp;
     OpenFile *openFile;
     int amountRead, fileLength;
@@ -244,7 +245,7 @@ void PerformanceTest()
     printf("Write %d\n", openFile->Write(Contents, ContentSize));
     //writer->Fork(MyWriterThread, 10);
     reader->Fork(MyReaderThread, 10);
-    
+
     MyWriterThread(5);
 
     currentThread->Yield();
@@ -274,4 +275,32 @@ void SynchConsoleTest(char *in, char *out)
             return;
         }
     }
+}
+
+Pipe *pipe;
+void pipereader(int dummy)
+{
+    int cnt = 255;
+    char buf[32];
+    int n = pipe->Read(buf, 32);
+    printf("n = %d\n", n);
+    printf("%s", buf);
+    currentThread->Yield();
+    putchar('\n');
+}
+void pipewriter(int dummy)
+{
+    int cnt = 255;
+    char buf[20];
+    scanf("%s", buf);
+    int n = pipe->Write(buf, 10);
+    currentThread->Yield();
+}
+void PipeTest()
+{
+    pipe = new Pipe();
+    Thread *r = Thread::createThread("pipereader");
+    Thread *w = Thread::createThread("pipewriter");
+    r->Fork(pipewriter, 0);
+    w->Fork(pipereader, 0);
 }

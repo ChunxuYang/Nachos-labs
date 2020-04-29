@@ -52,6 +52,7 @@
 
 #include "utility.h"
 #include "system.h"
+#include "pipe.h"
 
 #ifdef THREADS
 extern int testnum;
@@ -61,9 +62,26 @@ extern int testnum;
 
 extern void ThreadTest(void), Copy(char *unixFile, char *nachosFile);
 extern void Print(char *file), PerformanceTest(void), MakeDir(char *dirname);
-extern void StartProcess(char *file), ConsoleTest(char *in, char *out), SynchConsoleTest(char* in, char* out);
+extern void StartProcess(char *file), ConsoleTest(char *in, char *out), SynchConsoleTest(char *in, char *out);
+extern void PipeTest();
 extern void MailTest(int networkID);
+//extern void PipeConsoleTest1(Pipe* pipe), PipeConsoleTest2(Pipe* pipe);
 
+void PipeConsoleTest1(Pipe *pipe)
+{
+	printf("input: ");
+	char input[SectorSize];
+	scanf("%s", input);
+	pipe->Write(input, strlen(input));
+}
+
+void PipeConsoleTest2(Pipe *pipe)
+{
+	printf("out: ");
+	char output[20];
+	pipe->Read(output, 20);
+	printf("%s\n", output);
+}
 //----------------------------------------------------------------------
 // main
 // 	Bootstrap the operating system kernel.
@@ -80,6 +98,7 @@ extern void MailTest(int networkID);
 
 int main(int argc, char **argv)
 {
+	Pipe *pipe1;  // = new Pipe();
 	int argCount; // the number of arguments
 				  // for a particular command
 
@@ -87,7 +106,6 @@ int main(int argc, char **argv)
 	(void)Initialize(argc, argv);
 #ifndef TEST_FILESYS
 #ifdef THREADS
-	printf("Fuck, in here again\n");
 	for (argc--, argv++; argc > 0; argc -= argCount, argv += argCount)
 	{
 		argCount = 1;
@@ -113,41 +131,60 @@ int main(int argc, char **argv)
 			printf(copyright);
 #ifdef USER_PROGRAM
 		//printf("shitshitshitshit\n");
-		if (!strcmp(*argv, "-x"))
-		{ // run a user program
-			ASSERT(argc > 1);
-			StartProcess(*(argv + 1));
-			argCount = 2;
-		}
-		else if (!strcmp(*argv, "-c"))
-		{ // test the console
-			if (argc == 1)
-				ConsoleTest(NULL, NULL);
-			else
-			{
-				ASSERT(argc > 2);
-				ConsoleTest(*(argv + 1), *(argv + 2));
-				argCount = 3;
-			}
-			interrupt->Halt(); // once we start the console, then
-							   // Nachos will loop forever waiting
-							   // for console input
-		}
-		else if (!strcmp(*argv, "-synch"))
+		pipe1 = new Pipe(95);
+		if (!strcmp(*argv, "-pa"))
 		{
-			if(argc == 1)
-			{
-				SynchConsoleTest(NULL, NULL);
-			}
-			else
-			{
-				ASSERT(argc > 2);
-				SynchConsoleTest(*(argv + 1), *(argv + 2));
-				argCount = 3;
-			}
+			PipeConsoleTest1(pipe1);
 			interrupt->Halt();
 		}
-		
+		else if (!strcmp(*argv, "-pb"))
+		{
+			PipeConsoleTest2(pipe1);
+
+			interrupt->Halt();
+		}
+		else
+		{
+			delete pipe1;
+			if (!strcmp(*argv, "-x"))
+			{ // run a user program
+				ASSERT(argc > 1);
+				StartProcess(*(argv + 1));
+				argCount = 2;
+			}
+			else if (!strcmp(*argv, "-c"))
+			{ // test the console
+				if (argc == 1)
+					ConsoleTest(NULL, NULL);
+				else
+				{
+					ASSERT(argc > 2);
+					ConsoleTest(*(argv + 1), *(argv + 2));
+					argCount = 3;
+				}
+				interrupt->Halt(); // once we start the console, then
+								   // Nachos will loop forever waiting
+								   // for console input
+			}
+			else if (!strcmp(*argv, "-synch"))
+			{
+				if (argc == 1)
+				{
+					SynchConsoleTest(NULL, NULL);
+				}
+				else
+				{
+					ASSERT(argc > 2);
+					SynchConsoleTest(*(argv + 1), *(argv + 2));
+					argCount = 3;
+				}
+				interrupt->Halt();
+			}
+			else if (!strcmp(*argv, "-pipe"))
+			{
+				PipeTest();
+			}
+		}
 
 #endif // USER_PROGRAM
 #ifdef FILESYS
