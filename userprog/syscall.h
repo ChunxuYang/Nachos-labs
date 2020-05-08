@@ -31,7 +31,7 @@
 #define SC_Yield	10
 
 #ifndef IN_ASM
-
+//extern Machine* machine;
 /* The system call interface.  These are the operations the Nachos
  * kernel needs to support, to be able to run user programs.
  *
@@ -107,7 +107,6 @@ int Read(char *buffer, int size, OpenFileId id);
 
 /* Close the file, we're done reading and writing to it. */
 void Close(OpenFileId id);
-
 
 
 /* User-level thread operations: Fork and Yield.  To allow multiple

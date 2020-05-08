@@ -1,4 +1,4 @@
-// main.cc
+// main.cc 
 //	Bootstrap code to initialize the operating system kernel.
 //
 //	Allows direct calls into internal operating system functions,
@@ -31,7 +31,7 @@
 //    -p prints a Nachos file to stdout
 //    -r removes a Nachos file from the file system
 //    -l lists the contents of the Nachos directory
-//    -D prints the contents of the entire file system
+//    -D prints the contents of the entire file system 
 //    -t tests the performance of the Nachos file system
 //
 //  NETWORK
@@ -43,7 +43,7 @@
 //  Some of the flags are interpreted here; some in system.cc.
 //
 // Copyright (c) 1992-1993 The Regents of the University of California.
-// All rights reserved.  See copyright.h for copyright notice and limitation
+// All rights reserved.  See copyright.h for copyright notice and limitation 
 // of liability and disclaimer of warranty provisions.
 
 #define MAIN
@@ -52,7 +52,6 @@
 
 #include "utility.h"
 #include "system.h"
-#include "pipe.h"
 
 #ifdef THREADS
 extern int testnum;
@@ -61,56 +60,41 @@ extern int testnum;
 // External functions used by this file
 
 extern void ThreadTest(void), Copy(char *unixFile, char *nachosFile);
-extern void Print(char *file), PerformanceTest(void), MakeDir(char *dirname);
-extern void StartProcess(char *file), ConsoleTest(char *in, char *out), SynchConsoleTest(char *in, char *out);
-extern void PipeTest();
+extern void Print(char *file), PerformanceTest(void);
+extern void StartProcess(char *file), ConsoleTest(char *in, char *out);
 extern void MailTest(int networkID);
-//extern void PipeConsoleTest1(Pipe* pipe), PipeConsoleTest2(Pipe* pipe);
 
-void PipeConsoleTest1(Pipe *pipe)
-{
-	printf("input: ");
-	char input[SectorSize];
-	scanf("%s", input);
-	pipe->Write(input, strlen(input));
-}
 
-void PipeConsoleTest2(Pipe *pipe)
-{
-	printf("out: ");
-	char output[20];
-	pipe->Read(output, 20);
-	printf("%s\n", output);
-}
+
 //----------------------------------------------------------------------
 // main
-// 	Bootstrap the operating system kernel.
-//
+// 	Bootstrap the operating system kernel.  
+//	
 //	Check command line arguments
 //	Initialize data structures
 //	(optionally) Call test procedure
 //
 //	"argc" is the number of command line arguments (including the name
-//		of the command) -- ex: "nachos -d +" -> argc = 3
+//		of the command) -- ex: "nachos -d +" -> argc = 3 
 //	"argv" is an array of strings, one for each command line argument
 //		ex: "nachos -d +" -> argv = {"nachos", "-d", "+"}
 //----------------------------------------------------------------------
 
-int main(int argc, char **argv)
+int
+main(int argc, char **argv)
 {
-	Pipe *pipe1;  // = new Pipe();
-	int argCount; // the number of arguments
-				  // for a particular command
+    int argCount;			// the number of arguments 
+					// for a particular command
 
-	DEBUG('t', "Entering main");
-	(void)Initialize(argc, argv);
-#ifndef TEST_FILESYS
+    DEBUG('t', "Entering main");
+    (void) Initialize(argc, argv);
+
+
+
 #ifdef THREADS
-	for (argc--, argv++; argc > 0; argc -= argCount, argv += argCount)
-	{
+    for (argc--, argv++; argc > 0; argc -= argCount, argv += argCount) {
 		argCount = 1;
-		switch (argv[0][1])
-		{
+		switch (argv[0][1]) {
 		case 'q':
 			testnum = atoi(argv[1]);
 			argCount++;
@@ -119,146 +103,73 @@ int main(int argc, char **argv)
 			testnum = 1;
 			break;
 		}
-	}
-	ThreadTest();
-#endif
+    }
+    ThreadTest();
 #endif
 
-	for (argc--, argv++; argc > 0; argc -= argCount, argv += argCount)
-	{
+    for (argc--, argv++; argc > 0; argc -= argCount, argv += argCount) {
 		argCount = 1;
-		if (!strcmp(*argv, "-z")) // print copyright
-			printf(copyright);
+        if (!strcmp(*argv, "-z"))               // print copyright
+            printf (copyright);
 #ifdef USER_PROGRAM
 		//printf("shitshitshitshit\n");
-		pipe1 = new Pipe(95);
-		if (!strcmp(*argv, "-pa"))
-		{
-			PipeConsoleTest1(pipe1);
-			interrupt->Halt();
+        if (!strcmp(*argv, "-x")) {        	// run a user program
+	    ASSERT(argc > 1);
+            StartProcess(*(argv + 1));
+            argCount = 2;
+        } else if (!strcmp(*argv, "-c")) {      // test the console
+	    if (argc == 1)
+	        ConsoleTest(NULL, NULL);
+	    else {
+		ASSERT(argc > 2);
+	        ConsoleTest(*(argv + 1), *(argv + 2));
+	        argCount = 3;
+	    }
+	    interrupt->Halt();		// once we start the console, then 
+					// Nachos will loop forever waiting 
+					// for console input
 		}
-		else if (!strcmp(*argv, "-pb"))
-		{
-			PipeConsoleTest2(pipe1);
-
-			interrupt->Halt();
-		}
-		else
-		{
-			delete pipe1;
-			if (!strcmp(*argv, "-x"))
-			{ // run a user program
-				ASSERT(argc > 1);
-				StartProcess(*(argv + 1));
-				argCount = 2;
-			}
-			else if (!strcmp(*argv, "-c"))
-			{ // test the console
-				if (argc == 1)
-					ConsoleTest(NULL, NULL);
-				else
-				{
-					ASSERT(argc > 2);
-					ConsoleTest(*(argv + 1), *(argv + 2));
-					argCount = 3;
-				}
-				interrupt->Halt(); // once we start the console, then
-								   // Nachos will loop forever waiting
-								   // for console input
-			}
-			else if (!strcmp(*argv, "-synch"))
-			{
-				if (argc == 1)
-				{
-					SynchConsoleTest(NULL, NULL);
-				}
-				else
-				{
-					ASSERT(argc > 2);
-					SynchConsoleTest(*(argv + 1), *(argv + 2));
-					argCount = 3;
-				}
-				interrupt->Halt();
-			}
-			else if (!strcmp(*argv, "-pipe"))
-			{
-				PipeTest();
-			}
-		}
-
+		
 #endif // USER_PROGRAM
 #ifdef FILESYS
-		if (!strcmp(*argv, "-cp"))
-		{ // copy from UNIX to Nachos
+		if (!strcmp(*argv, "-cp")) { 		// copy from UNIX to Nachos
 			ASSERT(argc > 2);
 			Copy(*(argv + 1), *(argv + 2));
 			argCount = 3;
-		}
-		else if (!strcmp(*argv, "-p"))
-		{ // print a Nachos file
+		} else if (!strcmp(*argv, "-p")) {	// print a Nachos file
 			ASSERT(argc > 1);
 			Print(*(argv + 1));
 			argCount = 2;
-		}
-		else if (!strcmp(*argv, "-r"))
-		{ // remove Nachos file
+		} else if (!strcmp(*argv, "-r")) {	// remove Nachos file
 			ASSERT(argc > 1);
 			fileSystem->Remove(*(argv + 1));
 			argCount = 2;
+		} else if (!strcmp(*argv, "-l")) {	// list Nachos directory
+				fileSystem->List();
+		} else if (!strcmp(*argv, "-D")) {	// print entire filesystem
+				fileSystem->Print();
+		} else if (!strcmp(*argv, "-t")) {	// performance test
+				PerformanceTest();
 		}
-		else if (!strcmp(*argv, "-l"))
-		{ // list Nachos directory
-			fileSystem->List();
-		}
-		else if (!strcmp(*argv, "-D"))
-		{ // print entire filesystem
-			fileSystem->Print();
-		}
-		else if (!strcmp(*argv, "-t"))
-		{ // performance test
-			PerformanceTest();
-		}
-		else if (!strcmp(*argv, "-mkdir"))
-		{
-			ASSERT(argc > 1);
-			MakeDir(*(argv + 1));
-			argCount = 2;
-		}
-		else if (!strcmp(*argv, "-rmdir"))
-		{
-			ASSERT(argc > 1);
-			bool success = fileSystem->RemoveDir(*(argv + 1));
-			ASSERT(success);
-			argCount = 2;
-		}
-		else if (!strcmp(*argv, "-ls"))
-		{
-			ASSERT(argc > 1);
-			fileSystem->ListDir(*(argv + 1));
-			argCount = 2;
-		}
-
-#else
 #endif // FILESYS
 #ifdef NETWORK
-		if (!strcmp(*argv, "-o"))
-		{
-			ASSERT(argc > 1);
-			Delay(2); // delay for 2 seconds
-					  // to give the user time to
-					  // start up another nachos
-			MailTest(atoi(*(argv + 1)));
-			argCount = 2;
-		}
+        if (!strcmp(*argv, "-o")) {
+	    ASSERT(argc > 1);
+            Delay(2); 				// delay for 2 seconds
+						// to give the user time to 
+						// start up another nachos
+            MailTest(atoi(*(argv + 1)));
+            argCount = 2;
+        }
 #endif // NETWORK
-	}
-	currentThread->Finish(); // NOTE: if the procedure "main"
-							 // returns, then the program "nachos"
-							 // will exit (as any other normal program
-							 // would).  But there may be other
-							 // threads on the ready list.  We switch
-							 // to those threads by saying that the
-							 // "main" thread is finished, preventing
-							 // it from returning.
-	return (0);				 // Not reached...
+    }
+    currentThread->Finish();	// NOTE: if the procedure "main" 
+				// returns, then the program "nachos"
+				// will exit (as any other normal program
+				// would).  But there may be other
+				// threads on the ready list.  We switch
+				// to those threads by saying that the
+				// "main" thread is finished, preventing
+				// it from returning.
+    return(0);			// Not reached...
 }

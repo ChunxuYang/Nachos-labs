@@ -237,12 +237,12 @@ int Bitmap::find() {
     if (out == -1)
         return out;
     map[out] = 1;
-    printf("Page %d is allocated\n", out);
+    DEBUG('M', "Page %d is allocated\n", out);
     return out;
 }
 
 void Bitmap::clear(int idx) {
     ASSERT(map[idx] == 1);
-    printf("Page %d is cleared\n", idx);
+    DEBUG('M', "Page %d is cleared\n", idx);
     map[idx] = 0;
 }
