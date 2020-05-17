@@ -1,7 +1,7 @@
 #include "syscall.h"
+//#include <stdio.h>
 
-int
-main()
+int main()
 {
-    
+    Exit(0);
 }

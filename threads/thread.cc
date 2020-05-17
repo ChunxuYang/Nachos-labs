@@ -38,7 +38,7 @@ void* thread_pointer[128];
 Thread::Thread(char* threadName)
 {
     name = threadName;
-
+    
     //IntStatus oldLevel = interrupt->SetLevel(IntOff);
     thread_cnt++;
     
@@ -51,6 +51,11 @@ Thread::Thread(char* threadName)
     stackTop = NULL;
     stack = NULL;
     status = JUST_CREATED;
+    for(int i = 0; i < max_thread; i++)
+    {
+        childThreads[i] = NULL;
+    }
+    fatherThread = this;
 #ifdef USER_PROGRAM
     space = NULL;
 #endif
@@ -106,7 +111,7 @@ Thread::Fork(VoidFunctionPtr func, int arg)
 {
     DEBUG('t', "Forking thread \"%s\" with func = 0x%x, arg = %d\n",
 	  name, (int) func, arg);
-    
+    //printf("=====> arg: %s", (char*) arg);
     StackAllocate(func, arg);
 
     IntStatus oldLevel = interrupt->SetLevel(IntOff);

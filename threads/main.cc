@@ -91,7 +91,7 @@ main(int argc, char **argv)
 
 
 
-#ifdef THREADS
+#if THREADS && !TEST_FILESYS
     for (argc--, argv++; argc > 0; argc -= argCount, argv += argCount) {
 		argCount = 1;
 		switch (argv[0][1]) {

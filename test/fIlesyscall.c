@@ -31,5 +31,5 @@ int main() {
     Close(fid_write);
     Close(fid_read);
 
-    Exit(numBytes);
+    Halt();
 }
